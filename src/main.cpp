@@ -281,7 +281,7 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
         else if (source[i] == ')') {
             tokens.push_back({ TokenType::right_paren, ")" });
         }
-        else if (source[i] != ' ') {
+        else if (source[i] != ' ' && source[i] != '\n' && source[i] != '\r') {
             std::cerr << "[Error] Unexpected token: " << source[i] << std::endl;
             exit(EXIT_FAILURE);
         }
