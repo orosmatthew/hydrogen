@@ -123,41 +123,6 @@ void exit(std::fstream& file)
     file << "    syscall\n";
 }
 
-void add(std::fstream& file, const Token& a, const Token& b)
-{
-    if (a.type != TokenType::u64 || b.type != TokenType::u64) {
-        std::cerr << "[Error] Invalid addition parameters" << std::endl;
-    }
-    file << "    ;; -- add --\n";
-    file << "    mov rax, " << std::stoul(a.value) << "\n";
-    file << "    add rax, " << std::stoul(b.value) << "\n";
-}
-
-void sub(std::fstream& file, const Token& a, const Token& b)
-{
-    if (a.type != TokenType::u64 || b.type != TokenType::u64) {
-        std::cerr << "[Error] Invalid subtraction parameters" << std::endl;
-    }
-    file << "    ;; -- sub --\n";
-    file << "    mov rax, " << std::stoul(a.value) << "\n";
-    file << "    sub rax, " << std::stoul(b.value) << "\n";
-}
-
-void statement(std::fstream& file, const Token& a, const Token& op, const Token& b)
-{
-    switch (op.type) {
-    case TokenType::add:
-        add(file, a, b);
-        break;
-    case TokenType::sub:
-        sub(file, a, b);
-        break;
-    default:
-        std::cerr << "[Error] Invalid statement operation" << std::endl;
-        ::exit(EXIT_FAILURE);
-    }
-}
-
 void ast_expr(std::fstream& file, const ASTNode& expr);
 
 void ast_factor(std::fstream& file, const ASTNode& factor)
@@ -354,23 +319,22 @@ int main(int argc, const char* argv[])
     const std::string input_filename = input_file_path.stem();
     const std::filesystem::path input_dir = input_file_path.root_directory();
 
-    std::vector<Token> file_tokens = tokenize_file(input_file_path);
-    for (const Token& token : file_tokens) {
-        std::cout << token.value << "\t" << to_string(token.type) << std::endl;
-    }
+    std::cout << "[Info] Compiling: " << input_file_path.string() << std::endl;
 
-    std::cout << "SIZE: " << file_tokens.size() << std::endl;
+    std::cout << "[Progress] Tokenizing" << std::endl;
+
+    std::vector<Token> file_tokens = tokenize_file(input_file_path);
+    //    for (const Token& token : file_tokens) {
+    //        std::cout << token.value << "\t" << to_string(token.type) << std::endl;
+    //    }
+
+    std::cout << "[Progress] Parsing" << std::endl;
 
     Parser parser(std::move(file_tokens));
 
     ASTNode expr_node = parser.parse_expr();
 
-    print_ast(expr_node);
-
-    std::vector<Token> tokens;
-    tokens.push_back({ TokenType::u64, "99" });
-    tokens.push_back({ TokenType::sub });
-    tokens.push_back({ TokenType::u64, "10" });
+    std::cout << "[Progress] Generating" << std::endl;
     {
         std::fstream file((input_dir / (input_filename + ".asm")), std::ios::out);
 
@@ -383,29 +347,9 @@ int main(int argc, const char* argv[])
             gen::print_newline(file);
             gen::exit(file);
         }
-
-        //        gen::print_u64_def(file);
-        //        gen::start(file);
-        //        {
-        //            gen::statement(file, tokens[0], tokens[1], tokens[2]);
-        //            file << "    ;; -- moving for print ---\n";
-        //            file << "    mov rdi, rax\n";
-        //            gen::print_u64(file);
-        //            gen::print_newline(file);
-        //            gen::exit(file);
-        //        }
-
-        //        gen::print_u64_def(file);
-        //        gen::start(file);
-        //        {
-        //            gen::print_u64(file, 777);
-        //            gen::print_newline(file);
-        //            gen::print_u64(file, 420);
-        //            gen::print_newline(file);
-        //            gen::exit(file);
-        //        }
     }
 
+    std::cout << "[Progress] Assembling" << std::endl;
     std::stringstream nasm_cmd;
     nasm_cmd << "nasm -felf64 " << input_dir / input_filename << ".asm";
     int return_val = system(nasm_cmd.str().c_str());
@@ -415,6 +359,7 @@ int main(int argc, const char* argv[])
         exit(EXIT_FAILURE);
     }
 
+    std::cout << "[Progress] Linking" << std::endl;
     std::stringstream ld_cmd;
     ld_cmd << "ld " << input_dir / input_filename << ".o -o " << input_filename;
     return_val = system(ld_cmd.str().c_str());
@@ -424,5 +369,6 @@ int main(int argc, const char* argv[])
         exit(EXIT_FAILURE);
     }
 
+    std::cout << "[Progress] Done" << std::endl;
     return EXIT_SUCCESS;
 }
