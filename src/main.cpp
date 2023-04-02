@@ -4,7 +4,7 @@
 #include <optional>
 #include <vector>
 
-enum class TokenType { none, u64, add, sub, left_paren, right_paren };
+enum class TokenType { none, u64, add, sub, multi, div, left_paren, right_paren };
 
 std::string to_string(TokenType type)
 {
@@ -17,6 +17,10 @@ std::string to_string(TokenType type)
         return "add";
     case TokenType::sub:
         return "sub";
+    case TokenType::multi:
+        return "multi";
+    case TokenType::div:
+        return "div";
     case TokenType::left_paren:
         return "left_paren";
     case TokenType::right_paren:
@@ -31,7 +35,7 @@ struct Token {
     std::string value;
 };
 
-enum class ASTNodeType { none, expr, expr_pred, factor, term };
+enum class ASTNodeType { none, expr, expr_pred, factor, term, term_pred, terminal };
 
 std::string to_string(ASTNodeType type)
 {
@@ -46,6 +50,10 @@ std::string to_string(ASTNodeType type)
         return "factor";
     case ASTNodeType::term:
         return "term";
+    case ASTNodeType::term_pred:
+        return "term_pred";
+    case ASTNodeType::terminal:
+        return "terminal";
     default:
         return "invalid";
     }
@@ -135,12 +143,14 @@ void ast_factor(std::fstream& file, const ASTNode& factor)
     }
 }
 
+void ast_term(std::fstream& file, const ASTNode& term);
+
 void ast_expr_pred(std::fstream& file, const ASTNode& expr_pred)
 {
     if (expr_pred.children.empty()) {
         return;
     }
-    ast_factor(file, expr_pred.children.at(1));
+    ast_term(file, expr_pred.children.at(1));
     if (expr_pred.children.at(0).token->type == TokenType::add) {
         file << "    pop rcx\n";
         file << "    pop rdx\n";
@@ -156,9 +166,36 @@ void ast_expr_pred(std::fstream& file, const ASTNode& expr_pred)
     ast_expr_pred(file, expr_pred.children.at(2));
 }
 
+void ast_term_pred(std::fstream& file, const ASTNode& term_pred)
+{
+    if (term_pred.children.empty()) {
+        return;
+    }
+    ast_factor(file, term_pred.children.at(1));
+    if (term_pred.children.at(0).token->type == TokenType::multi) {
+        file << "    pop rax\n";
+        file << "    pop rcx\n";
+        file << "    mul rcx\n";
+        file << "    push rax\n";
+    }
+    else if (term_pred.children.at(0).token->type == TokenType::div) {
+        file << "    pop rcx\n";
+        file << "    pop rax\n";
+        file << "    div rcx\n";
+        file << "    push rax\n";
+    }
+    ast_term_pred(file, term_pred.children.at(2));
+}
+
+void ast_term(std::fstream& file, const ASTNode& term)
+{
+    ast_factor(file, term.children.at(0));
+    ast_term_pred(file, term.children.at(1));
+}
+
 void ast_expr(std::fstream& file, const ASTNode& expr)
 {
-    ast_factor(file, expr.children.at(0));
+    ast_term(file, expr.children.at(0));
     ast_expr_pred(file, expr.children.at(1));
 }
 } // namespace gen
@@ -176,21 +213,21 @@ public:
         ASTNode factor { ASTNodeType::factor };
         if (peak().has_value()) {
             if (peak().value()->type == TokenType::left_paren) {
-                factor.children.emplace_back(ASTNodeType::term, consume());
+                factor.children.emplace_back(ASTNodeType::terminal, consume());
                 factor.children.push_back(parse_expr());
                 if (peak().has_value() && peak().value()->type == TokenType::right_paren) {
-                    factor.children.emplace_back(ASTNodeType::term, consume());
+                    factor.children.emplace_back(ASTNodeType::terminal, consume());
                 }
                 else {
-                    std::cerr << "[Error] Unmatched parentheses in factor" << std::endl;
+                    std::cerr << "[Error] Expected `)`" << std::endl;
                     exit(EXIT_FAILURE);
                 }
             }
             else if (peak().value()->type == TokenType::u64) {
-                factor.children.emplace_back(ASTNodeType::term, consume());
+                factor.children.emplace_back(ASTNodeType::terminal, consume());
             }
             else {
-                std::cerr << "[Error] Invalid factor: " << peak().value()->value << std::endl;
+                std::cerr << "[Error] Invalid token: " << peak().value()->value << std::endl;
                 exit(EXIT_FAILURE);
             }
         }
@@ -205,27 +242,42 @@ public:
     {
         ASTNode expr_pred { ASTNodeType::expr_pred };
         if (peak().has_value()) {
-            if (peak().value()->type == TokenType::add) {
-                expr_pred.children.emplace_back(ASTNodeType::term, consume());
-                expr_pred.children.push_back(parse_factor());
+            if (peak().value()->type == TokenType::add || peak().value()->type == TokenType::sub) {
+                expr_pred.children.emplace_back(ASTNodeType::terminal, consume());
+                expr_pred.children.push_back(parse_term());
                 expr_pred.children.push_back(parse_expr_pred());
-            }
-            else if (peak().value()->type == TokenType::sub) {
-                expr_pred.children.emplace_back(ASTNodeType::term, consume());
-                expr_pred.children.push_back(parse_factor());
-                expr_pred.children.push_back(parse_expr_pred());
-            }
-            else {
-                return { ASTNodeType::none };
+                return expr_pred;
             }
         }
-        return expr_pred;
+        return { ASTNodeType::none };
+    }
+
+    ASTNode parse_term_pred()
+    {
+        ASTNode term_pred { ASTNodeType::term_pred };
+        if (peak().has_value()) {
+            if (peak().value()->type == TokenType::multi || peak().value()->type == TokenType::div) {
+                term_pred.children.emplace_back(ASTNodeType::terminal, consume());
+                term_pred.children.push_back(parse_factor());
+                term_pred.children.push_back(parse_term_pred());
+                return term_pred;
+            }
+        }
+        return { ASTNodeType::none };
+    }
+
+    ASTNode parse_term()
+    {
+        ASTNode term { ASTNodeType::term };
+        term.children.push_back(parse_factor());
+        term.children.push_back(parse_term_pred());
+        return term;
     }
 
     ASTNode parse_expr()
     {
         ASTNode expr { ASTNodeType::expr };
-        expr.children.push_back(parse_factor());
+        expr.children.push_back(parse_term());
         expr.children.push_back(parse_expr_pred());
         return expr;
     }
@@ -275,6 +327,12 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
         else if (source[i] == '-') {
             tokens.push_back({ TokenType::sub, "-" });
         }
+        else if (source[i] == '*') {
+            tokens.push_back({ TokenType::multi, "*" });
+        }
+        else if (source[i] == '/') {
+            tokens.push_back({ TokenType::div, "/" });
+        }
         else if (source[i] == '(') {
             tokens.push_back({ TokenType::left_paren, "(" });
         }
@@ -282,7 +340,7 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             tokens.push_back({ TokenType::right_paren, ")" });
         }
         else if (source[i] != ' ' && source[i] != '\n' && source[i] != '\r') {
-            std::cerr << "[Error] Unexpected token: " << source[i] << std::endl;
+            std::cerr << "[Error] Unexpected token: `" << source[i] << "`" << std::endl;
             exit(EXIT_FAILURE);
         }
     }
@@ -298,7 +356,7 @@ void print_ast(const ASTNode& node, int level = 0)
     std::cout << bars << to_string(node.type) << "\n";
     bars.append("| ");
     for (const ASTNode& child : node.children) {
-        if (child.type == ASTNodeType::term) {
+        if (child.type == ASTNodeType::terminal) {
             std::cout << bars << "-- " << child.token->value << "\n";
         }
         else {
