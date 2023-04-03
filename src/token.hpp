@@ -1,14 +1,14 @@
 #pragma once
 
-enum class TokenType { none, u64, add, sub, multi, div, left_paren, right_paren };
+enum class TokenType { none, i64, add, sub, multi, div, left_paren, right_paren };
 
 std::string to_string(TokenType type)
 {
     switch (type) {
     case TokenType::none:
         return "none";
-    case TokenType::u64:
-        return "u64";
+    case TokenType::i64:
+        return "pos_i64";
     case TokenType::add:
         return "add";
     case TokenType::sub:
@@ -47,7 +47,7 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
                 i++;
             } while (isdigit(source[i]));
             i--;
-            tokens.push_back({ TokenType::u64, num_buf });
+            tokens.push_back({ TokenType::i64, num_buf });
         }
         else if (source[i] == '+') {
             tokens.push_back({ TokenType::add, "+" });

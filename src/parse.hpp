@@ -25,7 +25,11 @@ public:
                     exit(EXIT_FAILURE);
                 }
             }
-            else if (peak().value()->type == TokenType::u64) {
+            else if (peak().value()->type == TokenType::i64) {
+                factor.children.push_back(ast::NodeTerminal(consume()));
+            }
+            else if (peak().value()->type == TokenType::sub) {
+                factor.children.push_back(ast::NodeTerminal(consume()));
                 factor.children.push_back(ast::NodeTerminal(consume()));
             }
             else {

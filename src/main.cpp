@@ -27,9 +27,9 @@ int main(int argc, const char* argv[])
     std::cout << "[Progress] Tokenizing" << std::endl;
 
     std::vector<Token> file_tokens = tokenize_file(input_file_path);
-    //    for (const Token& token : file_tokens) {
-    //        std::cout << token.value << "\t" << to_string(token.type) << std::endl;
-    //    }
+    for (const Token& token : file_tokens) {
+        std::cout << token.value << "\t" << to_string(token.type) << std::endl;
+    }
 
     std::cout << "[Progress] Parsing" << std::endl;
 
@@ -37,16 +37,19 @@ int main(int argc, const char* argv[])
 
     ast::NodeExpr expr_node = parser.parse_expr();
 
+    ast::print_ast(expr_node);
+
     std::cout << "[Progress] Generating" << std::endl;
     {
         std::fstream file((input_dir / (input_filename + ".asm")), std::ios::out);
 
         gen::print_u64_def(file);
+        gen::print_i64_def(file);
         gen::start(file);
         {
             gen::ast_expr(file, expr_node);
             file << "    pop rdi\n";
-            gen::print_u64(file);
+            gen::print_i64(file);
             gen::print_newline(file);
             gen::exit(file);
         }

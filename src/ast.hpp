@@ -61,10 +61,17 @@ struct NodeFactor : public NodeBase {
         else
             return {};
     }
-    [[nodiscard]] std::optional<const Token*> u64() const
+    [[nodiscard]] std::optional<const Token*> pos_i64() const
     {
-        if (children.at(0).token->type == TokenType::u64)
+        if (children.at(0).token->type == TokenType::i64)
             return children.at(0).token;
+        else
+            return {};
+    }
+    [[nodiscard]] std::optional<const Token*> neg_i64() const
+    {
+        if (children.at(0).token->type == TokenType::sub)
+            return children.at(1).token;
         else
             return {};
     }
@@ -175,7 +182,7 @@ void print_ast(const NodeBase& node, int level = 0)
     bars.append("| ");
     for (const NodeBase& child : node.children) {
         if (child.type == ASTNodeType::terminal) {
-            std::cout << bars << "-- " << child.token->value << "\n";
+            std::cout << bars << child.token->value << "\n";
         }
         else {
             print_ast(child, level + 1);
