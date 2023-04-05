@@ -84,6 +84,7 @@ void print_u64(std::fstream& file)
 
 void print_i64(std::fstream& file)
 {
+    file << "    ;; -- print_i64 --\n";
     file << "    call print_i64\n";
 }
 void print_newline(std::fstream& file)
@@ -124,7 +125,7 @@ void ast_factor(std::fstream& file, const ast::NodeFactor& factor)
     else if (factor.pos_i64().has_value()) {
         file << "    push " << std::stoul(factor.pos_i64().value()->value) << "\n";
     }
-    else {
+    else if (factor.neg_i64().has_value()) {
         file << "    mov rcx, " << std::stoul(factor.neg_i64().value()->value) << "\n";
         file << "    neg rcx\n";
         file << "    push rcx\n";
@@ -186,5 +187,29 @@ void ast_expr(std::fstream& file, const ast::NodeExpr& expr)
 {
     ast_term(file, expr.term());
     ast_expr_pred(file, expr.expr_pred());
+}
+
+void ast_stmt_pred(std::fstream& file, const ast::NodeStmtPred& stmt_pred)
+{
+    if (stmt_pred.expr().has_value()) {
+        file << "    ;; -- stmt --\n";
+        ast_expr(file, stmt_pred.expr().value());
+        file << "    pop rdi\n";
+        gen::print_i64(file);
+        gen::print_newline(file);
+        if (stmt_pred.stmt_pred().has_value()) {
+            ast_stmt_pred(file, stmt_pred.stmt_pred().value());
+        }
+    }
+}
+
+void ast_stmt(std::fstream& file, const ast::NodeStmt& stmt)
+{
+    file << "    ;; -- stmt --\n";
+    ast_expr(file, stmt.expr());
+    file << "    pop rdi\n";
+    gen::print_i64(file);
+    gen::print_newline(file);
+    ast_stmt_pred(file, stmt.stmt_pred());
 }
 } // namespace gen

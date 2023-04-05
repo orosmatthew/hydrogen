@@ -4,7 +4,7 @@
 
 namespace ast {
 
-enum class ASTNodeType { none, expr, expr_pred, factor, term, term_pred, terminal };
+enum class ASTNodeType { none, expr, expr_pred, factor, term, term_pred, terminal, stmt, stmt_pred };
 
 std::string to_string(ASTNodeType type)
 {
@@ -23,8 +23,12 @@ std::string to_string(ASTNodeType type)
         return "term_pred";
     case ASTNodeType::terminal:
         return "terminal";
+    case ASTNodeType::stmt:
+        return "stmt";
+    case ASTNodeType::stmt_pred:
+        return "stmt_pred";
     default:
-        return "invalid";
+        return "unknown";
     }
 }
 
@@ -56,21 +60,21 @@ struct NodeFactor : public NodeBase {
     }
     [[nodiscard]] std::optional<const std::reference_wrapper<NodeExpr>> expr() const
     {
-        if (children.at(0).token->type == TokenType::left_paren)
+        if (!children.empty() && children.at(0).token->type == TokenType::left_paren)
             return (NodeExpr&)(children.at(1));
         else
             return {};
     }
     [[nodiscard]] std::optional<const Token*> pos_i64() const
     {
-        if (children.at(0).token->type == TokenType::i64)
+        if (!children.empty() && children.at(0).token->type == TokenType::i64)
             return children.at(0).token;
         else
             return {};
     }
     [[nodiscard]] std::optional<const Token*> neg_i64() const
     {
-        if (children.at(0).token->type == TokenType::sub)
+        if (!children.empty() && children.at(0).token->type == TokenType::sub)
             return children.at(1).token;
         else
             return {};
@@ -169,6 +173,42 @@ public:
     [[nodiscard]] const NodeExprPred& expr_pred() const
     {
         return (NodeExprPred&)(children.at(1));
+    }
+};
+
+struct NodeStmtPred : public NodeBase {
+    NodeStmtPred()
+    {
+        type = ASTNodeType::stmt_pred;
+    }
+    [[nodiscard]] std::optional<std::reference_wrapper<NodeExpr>> expr() const
+    {
+        if (children.empty())
+            return {};
+        else
+            return (NodeExpr&)children.at(0);
+    }
+    [[nodiscard]] std::optional<std::reference_wrapper<NodeStmtPred>> stmt_pred() const
+    {
+        if (children.empty())
+            return {};
+        else
+            return (NodeStmtPred&)children.at(2);
+    }
+};
+
+struct NodeStmt : public NodeBase {
+    NodeStmt()
+    {
+        type = ASTNodeType::stmt;
+    }
+    [[nodiscard]] const NodeExpr& expr() const
+    {
+        return (NodeExpr&)children.at(0);
+    }
+    [[nodiscard]] const NodeStmtPred& stmt_pred() const
+    {
+        return (NodeStmtPred&)children.at(2);
     }
 };
 

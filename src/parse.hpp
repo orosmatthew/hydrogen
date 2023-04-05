@@ -1,6 +1,8 @@
 #pragma once
 
+#include "ast.hpp"
 #include "parse.hpp"
+#include "token.hpp"
 
 class Parser {
 public:
@@ -32,14 +34,6 @@ public:
                 factor.children.push_back(ast::NodeTerminal(consume()));
                 factor.children.push_back(ast::NodeTerminal(consume()));
             }
-            else {
-                std::cerr << "[Error] Invalid token: " << peak().value()->value << std::endl;
-                exit(EXIT_FAILURE);
-            }
-        }
-        else {
-            std::cerr << "[Error] Unexpected end of tokens" << std::endl;
-            exit(EXIT_FAILURE);
         }
         return factor;
     }
@@ -88,6 +82,42 @@ public:
         return expr;
     }
 
+    ast::NodeStmt parse_stmt()
+    {
+        ast::NodeStmt stmt;
+        stmt.children.push_back(parse_expr());
+        if (peak().has_value() && peak().value()->type == TokenType::semi) {
+            stmt.children.push_back(ast::NodeTerminal(consume()));
+        }
+        else {
+            std::cerr << "[Error] Expected `;`" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        stmt.children.push_back(parse_stmt_pred());
+
+        return stmt;
+    }
+
+    ast::NodeStmtPred parse_stmt_pred()
+    {
+        ast::NodeStmtPred stmt_pred;
+        m_was_consumed = false;
+        auto node = parse_expr();
+        if (!m_was_consumed) {
+            return stmt_pred;
+        }
+        stmt_pred.children.push_back(node);
+        if (peak().has_value() && peak().value()->type == TokenType::semi) {
+            stmt_pred.children.push_back(ast::NodeTerminal(consume()));
+        }
+        else {
+            std::cerr << "[Error] Expected `;`" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        stmt_pred.children.push_back(parse_stmt_pred());
+        return stmt_pred;
+    }
+
 private:
     std::optional<const Token*> peak()
     {
@@ -101,9 +131,12 @@ private:
 
     const Token* consume()
     {
+        m_was_consumed = true;
         index++;
         return &m_tokens.at(index - 1);
     }
+
+    bool m_was_consumed = false;
 
     const std::vector<Token> m_tokens;
     size_t index;

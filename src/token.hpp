@@ -1,6 +1,6 @@
 #pragma once
 
-enum class TokenType { none, i64, add, sub, multi, div, left_paren, right_paren };
+enum class TokenType { none, i64, add, sub, multi, div, left_paren, right_paren, semi };
 
 std::string to_string(TokenType type)
 {
@@ -21,6 +21,8 @@ std::string to_string(TokenType type)
         return "left_paren";
     case TokenType::right_paren:
         return "right_paren";
+    case TokenType::semi:
+        return "semi";
     default:
         return "invalid";
     }
@@ -66,6 +68,9 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
         }
         else if (source[i] == ')') {
             tokens.push_back({ TokenType::right_paren, ")" });
+        }
+        else if (source[i] == ';') {
+            tokens.push_back({ TokenType::semi, ";" });
         }
         else if (source[i] != ' ' && source[i] != '\n' && source[i] != '\r') {
             std::cerr << "[Error] Unexpected token: `" << source[i] << "`" << std::endl;
