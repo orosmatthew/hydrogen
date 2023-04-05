@@ -137,75 +137,74 @@ void ast_term(std::fstream& file, const ast::NodeTerm* term);
 
 void ast_expr_pred(std::fstream& file, const ast::NodeExprPred* expr_pred)
 {
-    if (!expr_pred->var.has_value()) {
-        return;
-    }
-    if (auto node_add = std::get_if<ast::NodeExprPredAdd*>(&expr_pred->var.value())) {
+    if (auto node_add = std::get_if<ast::NodeExprPredAdd*>(&expr_pred->var)) {
         ast_term(file, (*node_add)->term);
         file << "    pop rcx\n";
         file << "    pop rdx\n";
         file << "    add rdx, rcx\n";
         file << "    push rdx\n";
-        ast_expr_pred(file, (*node_add)->expr_pred);
+        if ((*node_add)->expr_pred.has_value()) {
+            ast_expr_pred(file, (*node_add)->expr_pred.value());
+        }
     }
-    else if (auto node_sub = std::get_if<ast::NodeExprPredSub*>(&expr_pred->var.value())) {
+    else if (auto node_sub = std::get_if<ast::NodeExprPredSub*>(&expr_pred->var)) {
         ast_term(file, (*node_sub)->term);
         file << "    pop rcx\n";
         file << "    pop rdx\n";
         file << "    sub rdx, rcx\n";
         file << "    push rdx\n";
-        ast_expr_pred(file, (*node_sub)->expr_pred);
+        if ((*node_sub)->expr_pred.has_value()) {
+            ast_expr_pred(file, (*node_sub)->expr_pred.value());
+        }
     }
 }
 
 void ast_term_pred(std::fstream& file, const ast::NodeTermPred* term_pred)
 {
-    if (!term_pred->var.has_value()) {
-        return;
-    }
-    if (auto node_multi = std::get_if<ast::NodeTermPredMulti*>(&term_pred->var.value())) {
+    if (auto node_multi = std::get_if<ast::NodeTermPredMulti*>(&term_pred->var)) {
         ast_factor(file, (*node_multi)->factor);
         file << "    pop rax\n";
         file << "    pop rcx\n";
         file << "    imul rcx\n";
         file << "    push rax\n";
-        ast_term_pred(file, (*node_multi)->term_pred);
+        if ((*node_multi)->term_pred.has_value()) {
+            ast_term_pred(file, (*node_multi)->term_pred.value());
+        }
     }
-    else if (auto node_div = std::get_if<ast::NodeTermPredDiv*>(&term_pred->var.value())) {
+    else if (auto node_div = std::get_if<ast::NodeTermPredDiv*>(&term_pred->var)) {
         ast_factor(file, (*node_div)->factor);
         file << "    pop rcx\n";
         file << "    pop rax\n";
         file << "    cqo\n";
         file << "    idiv rcx\n";
         file << "    push rax\n";
-        ast_term_pred(file, (*node_div)->term_pred);
+        if ((*node_div)->term_pred.has_value()) {
+            ast_term_pred(file, (*node_div)->term_pred.value());
+        }
     }
 }
 
 void ast_term(std::fstream& file, const ast::NodeTerm* term)
 {
     ast_factor(file, term->factor);
-    ast_term_pred(file, term->term_pred);
+    if (term->term_pred.has_value()) {
+        ast_term_pred(file, term->term_pred.value());
+    }
 }
 
 void ast_expr(std::fstream& file, const ast::NodeExpr* expr)
 {
     ast_term(file, expr->term);
-    ast_expr_pred(file, expr->expr_pred);
+    if (expr->expr_pred.has_value()) {
+        ast_expr_pred(file, expr->expr_pred.value());
+    }
 }
+
+void ast_stmt(std::fstream& file, const ast::NodeStmt* stmt);
 
 void ast_stmt_pred(std::fstream& file, const ast::NodeStmtPred* stmt_pred)
 {
-    if (stmt_pred->var.has_value()) {
-        file << "    ;; -- stmt --\n";
-        ast_expr(file, stmt_pred->var.value()->expr);
-        file << "    pop rdi\n";
-        gen::print_i64(file);
-        gen::print_newline(file);
-        if (stmt_pred->var.value()->stmt_pred->var.has_value()) {
-            ast_stmt_pred(file, stmt_pred->var.value()->stmt_pred->var.value()->stmt_pred);
-        }
-    }
+    ast_stmt(file, stmt_pred->stmt);
 }
 
 void ast_stmt(std::fstream& file, const ast::NodeStmt* stmt)
@@ -215,6 +214,8 @@ void ast_stmt(std::fstream& file, const ast::NodeStmt* stmt)
     file << "    pop rdi\n";
     gen::print_i64(file);
     gen::print_newline(file);
-    ast_stmt_pred(file, stmt->stmt_pred);
+    if (stmt->stmt_pred.has_value()) {
+        ast_stmt_pred(file, stmt->stmt_pred.value());
+    }
 }
 } // namespace gen

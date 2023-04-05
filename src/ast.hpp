@@ -32,22 +32,22 @@ struct NodeTermPred;
 struct NodeTermPredMulti {
     const Token* tok_multi;
     NodeFactor* factor;
-    NodeTermPred* term_pred;
+    std::optional<NodeTermPred*> term_pred;
 };
 
 struct NodeTermPredDiv {
     const Token* tok_div;
     NodeFactor* factor;
-    NodeTermPred* term_pred;
+    std::optional<NodeTermPred*> term_pred;
 };
 
 struct NodeTermPred {
-    std::optional<std::variant<NodeTermPredMulti*, NodeTermPredDiv*>> var;
+    std::variant<NodeTermPredMulti*, NodeTermPredDiv*> var;
 };
 
 struct NodeTerm {
     NodeFactor* factor;
-    NodeTermPred* term_pred;
+    std::optional<NodeTermPred*> term_pred;
 };
 
 struct NodeExprPred;
@@ -55,41 +55,34 @@ struct NodeExprPred;
 struct NodeExprPredAdd {
     const Token* tok_add;
     NodeTerm* term;
-    NodeExprPred* expr_pred;
+    std::optional<NodeExprPred*> expr_pred;
 };
 
 struct NodeExprPredSub {
     const Token* tok_sub;
     NodeTerm* term;
-    NodeExprPred* expr_pred;
+    std::optional<NodeExprPred*> expr_pred;
 };
 
 struct NodeExprPred {
-    std::optional<std::variant<NodeExprPredAdd*, NodeExprPredSub*>> var;
+    std::variant<NodeExprPredAdd*, NodeExprPredSub*> var;
 };
 
 struct NodeExpr {
     NodeTerm* term;
-    NodeExprPred* expr_pred;
+    std::optional<NodeExprPred*> expr_pred;
 };
 
 struct NodeStmt;
-struct NodeStmtPredExist;
 
 struct NodeStmtPred {
-    std::optional<NodeStmtPredExist*> var;
-};
-
-struct NodeStmtPredExist {
-    NodeExpr* expr;
-    const Token* tok_semi;
-    NodeStmtPred* stmt_pred;
+    NodeStmt* stmt;
 };
 
 struct NodeStmt {
     NodeExpr* expr;
     const Token* tok_semi;
-    NodeStmtPred* stmt_pred;
+    std::optional<NodeStmtPred*> stmt_pred;
 };
 
 // TODO

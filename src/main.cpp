@@ -35,9 +35,14 @@ int main(int argc, const char* argv[])
 
     Parser parser(std::move(file_tokens));
 
-    const ast::NodeStmt* root = parser.parse_stmt();
+    const auto ret = parser.parse_stmt();
+    if (!ret.has_value()) {
+        std::cerr << "[Error] Expected statement" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    const ast::NodeStmt* root = ret.value();
 
-//    ast::print_ast(root);
+    //    ast::print_ast(root);
 
     std::cout << "[Progress] Generating" << std::endl;
     {
