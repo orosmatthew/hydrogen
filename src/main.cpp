@@ -35,7 +35,7 @@ int main(int argc, const char* argv[])
 
     Parser parser(std::move(file_tokens));
 
-    ast::NodeStmt root = parser.parse_stmt();
+    const ast::NodeStmt* root = parser.parse_stmt();
 
 //    ast::print_ast(root);
 

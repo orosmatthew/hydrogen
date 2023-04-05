@@ -1,232 +1,113 @@
 #pragma once
 
+#include "alloc.hpp"
 #include "token.hpp"
+#include <variant>
 
 namespace ast {
 
-enum class ASTNodeType { none, expr, expr_pred, factor, term, term_pred, terminal, stmt, stmt_pred };
-
-std::string to_string(ASTNodeType type)
-{
-    switch (type) {
-    case ASTNodeType::none:
-        return "none";
-    case ASTNodeType::expr:
-        return "expr";
-    case ASTNodeType::expr_pred:
-        return "expr_pred";
-    case ASTNodeType::factor:
-        return "factor";
-    case ASTNodeType::term:
-        return "term";
-    case ASTNodeType::term_pred:
-        return "term_pred";
-    case ASTNodeType::terminal:
-        return "terminal";
-    case ASTNodeType::stmt:
-        return "stmt";
-    case ASTNodeType::stmt_pred:
-        return "stmt_pred";
-    default:
-        return "unknown";
-    }
-}
-
-struct NodeBase {
-    virtual ~NodeBase() = default;
-    ASTNodeType type = ASTNodeType::none;
-    const Token* token = nullptr;
-    std::vector<NodeBase> children {};
-};
-
-struct NodeTerminal : public NodeBase {
-    explicit NodeTerminal(const Token* tok)
-    {
-        token = tok;
-        type = ASTNodeType::terminal;
-    }
-    [[nodiscard]] const Token* tok() const
-    {
-        return token;
-    }
-};
-
 struct NodeExpr;
 
-struct NodeFactor : public NodeBase {
-    NodeFactor()
-    {
-        type = ASTNodeType::factor;
-    }
-    [[nodiscard]] std::optional<const std::reference_wrapper<NodeExpr>> expr() const
-    {
-        if (!children.empty() && children.at(0).token->type == TokenType::left_paren)
-            return (NodeExpr&)(children.at(1));
-        else
-            return {};
-    }
-    [[nodiscard]] std::optional<const Token*> pos_i64() const
-    {
-        if (!children.empty() && children.at(0).token->type == TokenType::i64)
-            return children.at(0).token;
-        else
-            return {};
-    }
-    [[nodiscard]] std::optional<const Token*> neg_i64() const
-    {
-        if (!children.empty() && children.at(0).token->type == TokenType::sub)
-            return children.at(1).token;
-        else
-            return {};
-    }
+struct NodeFactorParen {
+    const Token* tok_left_paren;
+    NodeExpr* expr;
+    const Token* tok_right_paren;
 };
 
-struct NodeTermPred : public NodeBase {
-    NodeTermPred()
-    {
-        type = ASTNodeType::term_pred;
-    }
-    [[nodiscard]] bool empty() const
-    {
-        return children.empty();
-    }
-    [[nodiscard]] std::optional<const Token*> op() const
-    {
-        if (children.empty())
-            return {};
-        else
-            return children.at(0).token;
-    }
-    [[nodiscard]] std::optional<const std::reference_wrapper<NodeFactor>> factor() const
-    {
-        if (children.empty())
-            return {};
-        else
-            return (NodeFactor&)(children.at(1));
-    }
-    [[nodiscard]] std::optional<const std::reference_wrapper<NodeTermPred>> term_pred() const
-    {
-        if (children.empty())
-            return {};
-        else
-            return (NodeTermPred&)(children.at(2));
-    }
+struct NodeFactorPos {
+    const Token* tok_num;
 };
 
-struct NodeTerm : public NodeBase {
-    NodeTerm()
-    {
-        type = ASTNodeType::term;
-    }
-    [[nodiscard]] const NodeFactor& factor() const
-    {
-        return (NodeFactor&)(children.at(0));
-    }
-    [[nodiscard]] const NodeTermPred& term_pred() const
-    {
-        return (NodeTermPred&)(children.at(1));
-    }
+struct NodeFactorNeg {
+    const Token* tok_sub;
+    const Token* tok_num;
 };
 
-struct NodeExprPred : public NodeBase {
-    NodeExprPred()
-    {
-        type = ASTNodeType::expr_pred;
-    }
-    [[nodiscard]] bool empty() const
-    {
-        return children.empty();
-    }
-    [[nodiscard]] std::optional<const Token*> op() const
-    {
-        if (children.empty())
-            return {};
-        else
-            return children.at(0).token;
-    }
-    [[nodiscard]] std::optional<const std::reference_wrapper<NodeTerm>> term() const
-    {
-        if (children.empty())
-            return {};
-        else
-            return (NodeTerm&)(children.at(1));
-    }
-    [[nodiscard]] std::optional<const std::reference_wrapper<NodeExprPred>> expr_pred() const
-    {
-        if (children.empty())
-            return {};
-        else
-            return (NodeExprPred&)(children.at(2));
-    }
+struct NodeFactor {
+    std::variant<NodeFactorParen*, NodeFactorPos*, NodeFactorNeg*> var;
 };
 
-struct NodeExpr : public NodeBase {
-public:
-    NodeExpr()
-    {
-        type = ASTNodeType::expr;
-    }
-    [[nodiscard]] const NodeTerm& term() const
-    {
-        return (NodeTerm&)(children.at(0));
-    }
-    [[nodiscard]] const NodeExprPred& expr_pred() const
-    {
-        return (NodeExprPred&)(children.at(1));
-    }
+struct NodeTermPred;
+
+struct NodeTermPredMulti {
+    const Token* tok_multi;
+    NodeFactor* factor;
+    NodeTermPred* term_pred;
 };
 
-struct NodeStmtPred : public NodeBase {
-    NodeStmtPred()
-    {
-        type = ASTNodeType::stmt_pred;
-    }
-    [[nodiscard]] std::optional<std::reference_wrapper<NodeExpr>> expr() const
-    {
-        if (children.empty())
-            return {};
-        else
-            return (NodeExpr&)children.at(0);
-    }
-    [[nodiscard]] std::optional<std::reference_wrapper<NodeStmtPred>> stmt_pred() const
-    {
-        if (children.empty())
-            return {};
-        else
-            return (NodeStmtPred&)children.at(2);
-    }
+struct NodeTermPredDiv {
+    const Token* tok_div;
+    NodeFactor* factor;
+    NodeTermPred* term_pred;
 };
 
-struct NodeStmt : public NodeBase {
-    NodeStmt()
-    {
-        type = ASTNodeType::stmt;
-    }
-    [[nodiscard]] const NodeExpr& expr() const
-    {
-        return (NodeExpr&)children.at(0);
-    }
-    [[nodiscard]] const NodeStmtPred& stmt_pred() const
-    {
-        return (NodeStmtPred&)children.at(2);
-    }
+struct NodeTermPred {
+    std::optional<std::variant<NodeTermPredMulti*, NodeTermPredDiv*>> var;
 };
 
-void print_ast(const NodeBase& node, int level = 0)
-{
-    std::string bars;
-    for (int i = 0; i < level; i++) {
-        bars.append("| ");
-    }
-    std::cout << bars << to_string(node.type) << "\n";
-    bars.append("| ");
-    for (const NodeBase& child : node.children) {
-        if (child.type == ASTNodeType::terminal) {
-            std::cout << bars << child.token->value << "\n";
-        }
-        else {
-            print_ast(child, level + 1);
-        }
-    }
-}
+struct NodeTerm {
+    NodeFactor* factor;
+    NodeTermPred* term_pred;
+};
+
+struct NodeExprPred;
+
+struct NodeExprPredAdd {
+    const Token* tok_add;
+    NodeTerm* term;
+    NodeExprPred* expr_pred;
+};
+
+struct NodeExprPredSub {
+    const Token* tok_sub;
+    NodeTerm* term;
+    NodeExprPred* expr_pred;
+};
+
+struct NodeExprPred {
+    std::optional<std::variant<NodeExprPredAdd*, NodeExprPredSub*>> var;
+};
+
+struct NodeExpr {
+    NodeTerm* term;
+    NodeExprPred* expr_pred;
+};
+
+struct NodeStmt;
+struct NodeStmtPredExist;
+
+struct NodeStmtPred {
+    std::optional<NodeStmtPredExist*> var;
+};
+
+struct NodeStmtPredExist {
+    NodeExpr* expr;
+    const Token* tok_semi;
+    NodeStmtPred* stmt_pred;
+};
+
+struct NodeStmt {
+    NodeExpr* expr;
+    const Token* tok_semi;
+    NodeStmtPred* stmt_pred;
+};
+
+// TODO
+// void print_ast(const NodeBase& node, int level = 0)
+//{
+//    std::string bars;
+//    for (int i = 0; i < level; i++) {
+//        bars.append("| ");
+//    }
+//    std::cout << bars << to_string(node.type) << "\n";
+//    bars.append("| ");
+//    for (const NodeBase& child : node.children) {
+//        if (child.type == ASTNodeType::terminal) {
+//            std::cout << bars << child.token->value << "\n";
+//        }
+//        else {
+//            print_ast(child, level + 1);
+//        }
+//    }
+//}
 }
