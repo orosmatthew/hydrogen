@@ -169,10 +169,41 @@ public:
         return let;
     }
 
+    std::optional<ast::NodeEq*> parse_eq()
+    {
+        if (!peak(2).has_value() || peak().value()->type != TokenType::ident
+            || peak(2).value()->type != TokenType::eq) {
+            return {};
+        }
+        auto* eq = m_alloc.alloc<ast::NodeEq>();
+        eq->tok_ident = consume();
+        eq->tok_eq = consume();
+        if (auto expr = parse_expr()) {
+            eq->expr = expr.value();
+        }
+        else {
+            error("Expected expression");
+        }
+        if (peak().has_value() && peak().value()->type == TokenType::semi) {
+            eq->tok_semi = consume();
+        }
+        else {
+            error("Expected `;`");
+        }
+        return eq;
+    }
+
     std::optional<ast::NodeStmt*> parse_stmt()
     {
         auto* stmt = m_alloc.alloc<ast::NodeStmt>();
-        if (auto expr = parse_expr()) {
+        if (auto eq = parse_eq()) {
+            auto* stmt_eq = m_alloc.alloc<ast::NodeStmtEq>();
+            stmt_eq->eq = eq.value();
+            stmt_eq->stmt_pred = parse_stmt_pred();
+            stmt->var = stmt_eq;
+            return stmt;
+        }
+        else if (auto expr = parse_expr()) {
             auto* stmt_expr = m_alloc.alloc<ast::NodeStmtExpr>();
             stmt_expr->expr = expr.value();
             if (peak().has_value() && peak().value()->type == TokenType::semi) {

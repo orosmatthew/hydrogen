@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast.hpp"
+#include <cassert>
 
 class Generator {
 public:
@@ -147,8 +148,8 @@ public:
             push(file, str.str());
         }
         else {
-            std::cerr << "[Error] Unreachable" << std::endl;
-            ::exit(EXIT_FAILURE);
+            // Unreachable
+            assert(false);
         }
     }
 
@@ -234,6 +235,17 @@ public:
         }
     }
 
+    void ast_eq(std::fstream& file, const ast::NodeEq* eq)
+    {
+        if (!m_vars.contains(eq->tok_ident->value)) {
+            std::cerr << "[Error] Unknown identifier" << std::endl;
+            ::exit(EXIT_FAILURE);
+        }
+        ast_expr(file, eq->expr);
+        pop(file, "rax");
+        file << "    mov QWORD [rsp + 8*" << m_stack_loc - m_vars.at(eq->tok_ident->value) << "], rax\n";
+    }
+
     void ast_stmt(std::fstream& file, const ast::NodeStmt* stmt)
     {
         file << "    ;; -- stmt --\n";
@@ -252,9 +264,15 @@ public:
                 ast_stmt_pred(file, (*stmt_let)->stmt_pred.value());
             }
         }
+        else if (auto stmt_eq = std::get_if<ast::NodeStmtEq*>(&stmt->var)) {
+            ast_eq(file, (*stmt_eq)->eq);
+            if ((*stmt_eq)->stmt_pred.has_value()) {
+                ast_stmt_pred(file, (*stmt_eq)->stmt_pred.value());
+            }
+        }
         else {
-            std::cerr << "[Error] Unreachable" << std::endl;
-            ::exit(EXIT_FAILURE);
+            // Unreachable
+            assert(false);
         }
     }
 

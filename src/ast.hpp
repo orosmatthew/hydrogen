@@ -102,8 +102,20 @@ struct NodeStmtLet {
     std::optional<NodeStmtPred*> stmt_pred;
 };
 
+struct NodeEq {
+    const Token* tok_ident;
+    const Token* tok_eq;
+    NodeExpr* expr;
+    const Token* tok_semi;
+};
+
+struct NodeStmtEq {
+    NodeEq* eq;
+    std::optional<NodeStmtPred*> stmt_pred;
+};
+
 struct NodeStmt {
-    std::variant<NodeStmtExpr*, NodeStmtLet*> var;
+    std::variant<NodeStmtExpr*, NodeStmtLet*, NodeStmtEq*> var;
 };
 
 // TODO
