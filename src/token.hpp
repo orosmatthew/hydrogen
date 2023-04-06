@@ -1,6 +1,7 @@
 #pragma once
 
-enum class TokenType { none, i64, add, sub, multi, div, left_paren, right_paren, semi };
+#include <cctype>
+enum class TokenType { none, i64, add, sub, multi, div, left_paren, right_paren, semi, let, ident, eq };
 
 std::string to_string(TokenType type)
 {
@@ -23,6 +24,12 @@ std::string to_string(TokenType type)
         return "right_paren";
     case TokenType::semi:
         return "semi";
+    case TokenType::let:
+        return "let";
+    case TokenType::ident:
+        return "ident";
+    case TokenType::eq:
+        return "eq";
     default:
         return "invalid";
     }
@@ -51,6 +58,20 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             i--;
             tokens.push_back({ TokenType::i64, num_buf });
         }
+        else if (isalpha(source[i])) {
+            std::string buf;
+            do {
+                buf.push_back(source[i]);
+                i++;
+            } while (isalnum(source[i]));
+            i--;
+            if (buf == "let") {
+                tokens.push_back({ TokenType::let, buf });
+            }
+            else {
+                tokens.push_back({ TokenType::ident, buf });
+            }
+        }
         else if (source[i] == '+') {
             tokens.push_back({ TokenType::add, "+" });
         }
@@ -71,6 +92,9 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
         }
         else if (source[i] == ';') {
             tokens.push_back({ TokenType::semi, ";" });
+        }
+        else if (source[i] == '=') {
+            tokens.push_back({ TokenType::eq, "=" });
         }
         else if (source[i] != ' ' && source[i] != '\n' && source[i] != '\r') {
             std::cerr << "[Error] Unexpected token: `" << source[i] << "`" << std::endl;

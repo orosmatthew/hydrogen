@@ -49,6 +49,12 @@ public:
             factor->var = node_neg;
             return factor;
         }
+        else if (peak().value()->type == TokenType::ident) {
+            auto* node_ident = m_alloc.alloc<ast::NodeFactorIdent>();
+            node_ident->tok_ident = consume();
+            factor->var = node_ident;
+            return factor;
+        }
         return {};
     }
 
@@ -138,23 +144,55 @@ public:
         return expr;
     }
 
-    std::optional<ast::NodeStmt*> parse_stmt()
+    std::optional<ast::NodeLet*> parse_let()
     {
-        auto* stmt = m_alloc.alloc<ast::NodeStmt>();
-        if (auto expr = parse_expr()) {
-            stmt->expr = expr.value();
-        }
-        else {
+        if (!peak(3).has_value() || peak().value()->type != TokenType::let || peak(2).value()->type != TokenType::ident
+            || peak(3).value()->type != TokenType::eq) {
             return {};
         }
+        auto* let = m_alloc.alloc<ast::NodeLet>();
+        let->tok_let = consume();
+        let->tok_ident = consume();
+        let->tok_eq = consume();
+        if (auto expr = parse_expr()) {
+            let->expr = expr.value();
+        }
+        else {
+            error("Expected expression");
+        }
         if (peak().has_value() && peak().value()->type == TokenType::semi) {
-            stmt->tok_semi = consume();
+            let->tok_semi = consume();
         }
         else {
             error("Expected `;`");
         }
-        stmt->stmt_pred = parse_stmt_pred();
-        return stmt;
+        return let;
+    }
+
+    std::optional<ast::NodeStmt*> parse_stmt()
+    {
+        auto* stmt = m_alloc.alloc<ast::NodeStmt>();
+        if (auto expr = parse_expr()) {
+            auto* stmt_expr = m_alloc.alloc<ast::NodeStmtExpr>();
+            stmt_expr->expr = expr.value();
+            if (peak().has_value() && peak().value()->type == TokenType::semi) {
+                stmt_expr->tok_semi = consume();
+            }
+            else {
+                error("Expected `;`");
+            }
+            stmt_expr->stmt_pred = parse_stmt_pred();
+            stmt->var = stmt_expr;
+            return stmt;
+        }
+        else if (auto let = parse_let()) {
+            auto* stmt_let = m_alloc.alloc<ast::NodeStmtLet>();
+            stmt_let->let = let.value();
+            stmt_let->stmt_pred = parse_stmt_pred();
+            stmt->var = stmt_let;
+            return stmt;
+        }
+        return {};
     }
 
     std::optional<ast::NodeStmtPred*> parse_stmt_pred()
@@ -169,10 +207,10 @@ public:
     }
 
 private:
-    std::optional<const Token*> peak()
+    std::optional<const Token*> peak(int ahead = 1)
     {
-        if (index < m_tokens.size()) {
-            return &m_tokens.at(index);
+        if (index + (ahead - 1) < m_tokens.size()) {
+            return &m_tokens.at(index + (ahead - 1));
         }
         else {
             return {};
