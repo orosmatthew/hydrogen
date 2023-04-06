@@ -104,7 +104,8 @@ public:
         file << "    mov rsi, rsp\n";
         file << "    mov rdx, 1\n";
         file << "    syscall\n";
-        file << "    add rsp, 1\n";
+        file << "    add rsp, 8\n";
+        m_stack_loc--;
     }
 
     static void start(std::fstream& file)
@@ -137,7 +138,13 @@ public:
             push(file, "rcx");
         }
         else if (auto node_ident = std::get_if<ast::NodeFactorIdent*>(&factor->var)) {
-            
+            if (!m_vars.contains((*node_ident)->tok_ident->value)) {
+                std::cerr << "[Error] Undefined identifier" << std::endl;
+                ::exit(EXIT_FAILURE);
+            }
+            std::stringstream str;
+            str << "QWORD [rsp + 8*" << m_stack_loc - m_vars.at((*node_ident)->tok_ident->value) << "]";
+            push(file, str.str());
         }
         else {
             std::cerr << "[Error] Unreachable" << std::endl;
@@ -215,6 +222,18 @@ public:
         ast_stmt(file, stmt_pred->stmt);
     }
 
+    void ast_let(std::fstream& file, const ast::NodeLet* let)
+    {
+        if (!m_vars.contains(let->tok_ident->value)) {
+            ast_expr(file, let->expr);
+            m_vars.insert({ let->tok_ident->value, m_stack_loc });
+        }
+        else {
+            std::cerr << "[Error] Identifier already defined" << std::endl;
+            ::exit(EXIT_FAILURE);
+        }
+    }
+
     void ast_stmt(std::fstream& file, const ast::NodeStmt* stmt)
     {
         file << "    ;; -- stmt --\n";
@@ -228,14 +247,7 @@ public:
             }
         }
         else if (auto stmt_let = std::get_if<ast::NodeStmtLet*>(&stmt->var)) {
-            if (!m_vars.contains((*stmt_let)->let->tok_ident)) {
-                ast_expr(file, (*stmt_let)->let->expr);
-                m_vars.insert({ (*stmt_let)->let->tok_ident, m_stack_loc });
-            }
-            else {
-                std::cerr << "[Error] Identifier already defined" << std::endl;
-                ::exit(EXIT_FAILURE);
-            }
+            ast_let(file, (*stmt_let)->let);
             if ((*stmt_let)->stmt_pred.has_value()) {
                 ast_stmt_pred(file, (*stmt_let)->stmt_pred.value());
             }
@@ -260,5 +272,5 @@ public:
 
 private:
     int m_stack_loc;
-    std::unordered_map<const Token*, int> m_vars {};
+    std::unordered_map<std::string, int> m_vars {};
 };
