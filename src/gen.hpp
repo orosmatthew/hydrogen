@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast.hpp"
+#include "token.hpp"
 #include <cassert>
 
 class Generator {
@@ -246,16 +247,21 @@ public:
         file << "    mov QWORD [rsp + 8*" << m_stack_loc - m_vars.at(eq->tok_ident->value) << "], rax\n";
     }
 
+    void ast_print(std::fstream& file, const ast::NodePrint* print)
+    {
+        ast_expr(file, print->expr);
+        pop(file, "rdi");
+        print_i64(file);
+        print_newline(file);
+    }
+
     void ast_stmt(std::fstream& file, const ast::NodeStmt* stmt)
     {
         file << "    ;; -- stmt --\n";
-        if (auto stmt_expr = std::get_if<ast::NodeStmtExpr*>(&stmt->var)) {
-            ast_expr(file, (*stmt_expr)->expr);
-            pop(file, "rdi");
-            print_i64(file);
-            print_newline(file);
-            if ((*stmt_expr)->stmt_pred.has_value()) {
-                ast_stmt_pred(file, (*stmt_expr)->stmt_pred.value());
+        if (auto stmt_print = std::get_if<ast::NodeStmtPrint*>(&stmt->var)) {
+            ast_print(file, (*stmt_print)->print);
+            if ((*stmt_print)->stmt_pred.has_value()) {
+                ast_stmt_pred(file, (*stmt_print)->stmt_pred.value());
             }
         }
         else if (auto stmt_let = std::get_if<ast::NodeStmtLet*>(&stmt->var)) {

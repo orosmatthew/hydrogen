@@ -91,12 +91,6 @@ struct NodeLet {
     const Token* tok_semi;
 };
 
-struct NodeStmtExpr {
-    NodeExpr* expr;
-    const Token* tok_semi;
-    std::optional<NodeStmtPred*> stmt_pred;
-};
-
 struct NodeStmtLet {
     NodeLet* let;
     std::optional<NodeStmtPred*> stmt_pred;
@@ -114,8 +108,21 @@ struct NodeStmtEq {
     std::optional<NodeStmtPred*> stmt_pred;
 };
 
+struct NodePrint {
+    const Token* tok_print;
+    const Token* tok_left_paren;
+    NodeExpr* expr;
+    const Token* tok_right_paren;
+    const Token* tok_semi;
+};
+
+struct NodeStmtPrint {
+    NodePrint* print;
+    std::optional<NodeStmtPred*> stmt_pred;
+};
+
 struct NodeStmt {
-    std::variant<NodeStmtExpr*, NodeStmtLet*, NodeStmtEq*> var;
+    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*> var;
 };
 
 // TODO

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cctype>
-enum class TokenType { none, i64, add, sub, multi, div, left_paren, right_paren, semi, let, ident, eq };
+enum class TokenType { none, i64, add, sub, multi, div, left_paren, right_paren, semi, let, ident, eq, print };
 
 std::string to_string(TokenType type)
 {
@@ -30,6 +30,8 @@ std::string to_string(TokenType type)
         return "ident";
     case TokenType::eq:
         return "eq";
+    case TokenType::print:
+        return "print";
     default:
         return "invalid";
     }
@@ -67,6 +69,9 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             i--;
             if (buf == "let") {
                 tokens.push_back({ TokenType::let, buf });
+            }
+            else if (buf == "print") {
+                tokens.push_back({ TokenType::print, buf });
             }
             else {
                 tokens.push_back({ TokenType::ident, buf });

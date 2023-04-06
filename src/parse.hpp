@@ -193,6 +193,36 @@ public:
         return eq;
     }
 
+    std::optional<ast::NodePrint*> parse_print()
+    {
+        if (!peak(2).has_value() || peak().value()->type != TokenType::print
+            || peak(2).value()->type != TokenType::left_paren) {
+            return {};
+        }
+        auto* print = m_alloc.alloc<ast::NodePrint>();
+        print->tok_print = consume();
+        print->tok_left_paren = consume();
+        if (auto expr = parse_expr()) {
+            print->expr = expr.value();
+        }
+        else {
+            error("Expected expression");
+        }
+        if (peak().has_value() && peak().value()->type == TokenType::right_paren) {
+            print->tok_right_paren = consume();
+        }
+        else {
+            error("Expected `)`");
+        }
+        if (peak().has_value() && peak().value()->type == TokenType::semi) {
+            print->tok_semi = consume();
+        }
+        else {
+            error("Expected `;`");
+        }
+        return print;
+    }
+
     std::optional<ast::NodeStmt*> parse_stmt()
     {
         auto* stmt = m_alloc.alloc<ast::NodeStmt>();
@@ -203,17 +233,11 @@ public:
             stmt->var = stmt_eq;
             return stmt;
         }
-        else if (auto expr = parse_expr()) {
-            auto* stmt_expr = m_alloc.alloc<ast::NodeStmtExpr>();
-            stmt_expr->expr = expr.value();
-            if (peak().has_value() && peak().value()->type == TokenType::semi) {
-                stmt_expr->tok_semi = consume();
-            }
-            else {
-                error("Expected `;`");
-            }
-            stmt_expr->stmt_pred = parse_stmt_pred();
-            stmt->var = stmt_expr;
+        else if (auto print = parse_print()) {
+            auto print_stmt = m_alloc.alloc<ast::NodeStmtPrint>();
+            print_stmt->print = print.value();
+            print_stmt->stmt_pred = parse_stmt_pred();
+            stmt->var = print_stmt;
             return stmt;
         }
         else if (auto let = parse_let()) {
