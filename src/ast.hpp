@@ -31,17 +31,52 @@ struct NodeFactor {
     std::variant<NodeFactorParen*, NodeFactorPos*, NodeFactorNeg*, NodeFactorIdent*> var;
 };
 
+struct NodeCmpPred;
+
+struct NodeCmpPredLt {
+    const Token* tok_lt;
+    NodeFactor* factor;
+    std::optional<NodeCmpPred*> cmp_pred;
+};
+
+struct NodeCmpPredGt {
+    const Token* tok_gt;
+    NodeFactor* factor;
+    std::optional<NodeCmpPred*> cmp_pred;
+};
+
+struct NodeCmpPredLte {
+    const Token* tok_lte;
+    NodeFactor* factor;
+    std::optional<NodeCmpPred*> cmp_pred;
+};
+
+struct NodeCmpPredGte {
+    const Token* tok_gte;
+    NodeFactor* factor;
+    std::optional<NodeCmpPred*> cmp_pred;
+};
+
+struct NodeCmpPred {
+    std::variant<NodeCmpPredLt*, NodeCmpPredGt*, NodeCmpPredLte*, NodeCmpPredGte*> var;
+};
+
+struct NodeCmp {
+    NodeFactor* factor;
+    std::optional<NodeCmpPred*> cmp_pred;
+};
+
 struct NodeTermPred;
 
 struct NodeTermPredMulti {
     const Token* tok_multi;
-    NodeFactor* factor;
+    NodeCmp* cmp;
     std::optional<NodeTermPred*> term_pred;
 };
 
 struct NodeTermPredDiv {
     const Token* tok_div;
-    NodeFactor* factor;
+    NodeCmp* cmp;
     std::optional<NodeTermPred*> term_pred;
 };
 
@@ -50,7 +85,7 @@ struct NodeTermPred {
 };
 
 struct NodeTerm {
-    NodeFactor* factor;
+    NodeCmp* cmp;
     std::optional<NodeTermPred*> term_pred;
 };
 

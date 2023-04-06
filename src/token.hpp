@@ -1,7 +1,25 @@
 #pragma once
 
 #include <cctype>
-enum class TokenType { none, i64, add, sub, multi, div, left_paren, right_paren, semi, let, ident, eq, print };
+enum class TokenType {
+    none,
+    i64,
+    add,
+    sub,
+    multi,
+    div,
+    left_paren,
+    right_paren,
+    semi,
+    let,
+    ident,
+    eq,
+    print,
+    lt,
+    gt,
+    lte,
+    gte
+};
 
 std::string to_string(TokenType type)
 {
@@ -100,6 +118,24 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
         }
         else if (source[i] == '=') {
             tokens.push_back({ TokenType::eq, "=" });
+        }
+        else if (source[i] == '<') {
+            if (source[i + 1] == '=') {
+                tokens.push_back({ TokenType::lte, "<=" });
+                i++;
+            }
+            else {
+                tokens.push_back({ TokenType::lt, "<" });
+            }
+        }
+        else if (source[i] == '>') {
+            if (source[i + 1] == '=') {
+                tokens.push_back({ TokenType::gte, ">=" });
+                i++;
+            }
+            else {
+                tokens.push_back({ TokenType::gt, ">" });
+            }
         }
         else if (source[i] != ' ' && source[i] != '\n' && source[i] != '\r') {
             std::cerr << "[Error] Unexpected token: `" << source[i] << "`" << std::endl;

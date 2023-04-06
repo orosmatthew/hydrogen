@@ -88,6 +88,80 @@ public:
         return {};
     }
 
+    std::optional<ast::NodeCmpPred*> parse_cmp_pred()
+    {
+        if (!peak().has_value()) {
+            return {};
+        }
+        auto* cmp_pred = m_alloc.alloc<ast::NodeCmpPred>();
+        if (peak().value()->type == TokenType::lt) {
+            auto* lt = m_alloc.alloc<ast::NodeCmpPredLt>();
+            lt->tok_lt = consume();
+            if (auto factor = parse_factor()) {
+                lt->factor = factor.value();
+            }
+            else {
+                error("Expected factor");
+            }
+            lt->cmp_pred = parse_cmp_pred();
+            cmp_pred->var = lt;
+            return cmp_pred;
+        }
+        else if (peak().value()->type == TokenType::gt) {
+            auto* gt = m_alloc.alloc<ast::NodeCmpPredGt>();
+            gt->tok_gt = consume();
+            if (auto factor = parse_factor()) {
+                gt->factor = factor.value();
+            }
+            else {
+                error("Expected factor");
+            }
+            gt->cmp_pred = parse_cmp_pred();
+            cmp_pred->var = gt;
+            return cmp_pred;
+        }
+        else if (peak().value()->type == TokenType::lte) {
+            auto* lte = m_alloc.alloc<ast::NodeCmpPredLte>();
+            lte->tok_lte = consume();
+            if (auto factor = parse_factor()) {
+                lte->factor = factor.value();
+            }
+            else {
+                error("Expected factor");
+            }
+            lte->cmp_pred = parse_cmp_pred();
+            cmp_pred->var = lte;
+            return cmp_pred;
+        }
+        else if (peak().value()->type == TokenType::gte) {
+            auto* gte = m_alloc.alloc<ast::NodeCmpPredGte>();
+            gte->tok_gte = consume();
+            if (auto factor = parse_factor()) {
+                gte->factor = factor.value();
+            }
+            else {
+                error("Expected factor");
+            }
+            gte->cmp_pred = parse_cmp_pred();
+            cmp_pred->var = gte;
+            return cmp_pred;
+        }
+        return {};
+    }
+
+    std::optional<ast::NodeCmp*> parse_cmp()
+    {
+        auto* cmp = m_alloc.alloc<ast::NodeCmp>();
+        if (auto factor = parse_factor()) {
+            cmp->factor = factor.value();
+        }
+        else {
+            return {};
+        }
+        cmp->cmp_pred = parse_cmp_pred();
+        return cmp;
+    }
+
     std::optional<ast::NodeTermPred*> parse_term_pred()
     {
         auto* term_pred = m_alloc.alloc<ast::NodeTermPred>();
@@ -97,11 +171,11 @@ public:
         if (peak().value()->type == TokenType::multi) {
             auto* node_multi = m_alloc.alloc<ast::NodeTermPredMulti>();
             node_multi->tok_multi = consume();
-            if (auto ret = parse_factor()) {
-                node_multi->factor = ret.value();
+            if (auto ret = parse_cmp()) {
+                node_multi->cmp = ret.value();
             }
             else {
-                error("Expected factor");
+                error("Invalid");
             }
             node_multi->term_pred = parse_term_pred();
             term_pred->var = node_multi;
@@ -110,7 +184,12 @@ public:
         else if (peak().value()->type == TokenType::div) {
             auto* node_div = m_alloc.alloc<ast::NodeTermPredDiv>();
             node_div->tok_div = consume();
-            node_div->factor = parse_factor().value();
+            if (auto ret = parse_cmp()) {
+                node_div->cmp = ret.value();
+            }
+            else {
+                error("Invalid");
+            }
             node_div->term_pred = parse_term_pred();
             term_pred->var = node_div;
             return term_pred;
@@ -121,8 +200,8 @@ public:
     std::optional<ast::NodeTerm*> parse_term()
     {
         auto* term = m_alloc.alloc<ast::NodeTerm>();
-        if (auto factor = parse_factor()) {
-            term->factor = factor.value();
+        if (auto cmp = parse_cmp()) {
+            term->cmp = cmp.value();
         }
         else {
             return {};
