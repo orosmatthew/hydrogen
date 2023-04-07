@@ -118,41 +118,29 @@ struct NodeStmtPred {
     NodeStmt* stmt;
 };
 
-struct NodeLet {
+struct NodeStmtLet {
     const Token* tok_let;
     const Token* tok_ident;
     const Token* tok_eq;
     NodeExpr* expr;
     const Token* tok_semi;
-};
-
-struct NodeStmtLet {
-    NodeLet* let;
     std::optional<NodeStmtPred*> stmt_pred;
-};
-
-struct NodeEq {
-    const Token* tok_ident;
-    const Token* tok_eq;
-    NodeExpr* expr;
-    const Token* tok_semi;
 };
 
 struct NodeStmtEq {
-    NodeEq* eq;
+    const Token* tok_ident;
+    const Token* tok_eq;
+    const NodeExpr* expr;
+    const Token* tok_semi;
     std::optional<NodeStmtPred*> stmt_pred;
 };
 
-struct NodePrint {
+struct NodeStmtPrint {
     const Token* tok_print;
     const Token* tok_left_paren;
     NodeExpr* expr;
     const Token* tok_right_paren;
     const Token* tok_semi;
-};
-
-struct NodeStmtPrint {
-    NodePrint* print;
     std::optional<NodeStmtPred*> stmt_pred;
 };
 

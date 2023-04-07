@@ -186,6 +186,7 @@ public:
             pop(file, "rbx");
             file << "    cmp rax, rbx\n";
             file << "    setg al\n";
+            file << "    movzx rax, al\n";
             push(file, "rax");
             if ((*lt)->cmp_pred.has_value()) {
                 ast_cmp_pred(file, (*lt)->cmp_pred.value());
@@ -197,6 +198,7 @@ public:
             pop(file, "rbx");
             file << "    cmp rax, rbx\n";
             file << "    setl al\n";
+            file << "    movzx rax, al\n";
             push(file, "rax");
             if ((*gt)->cmp_pred.has_value()) {
                 ast_cmp_pred(file, (*gt)->cmp_pred.value());
@@ -208,6 +210,7 @@ public:
             pop(file, "rbx");
             file << "    cmp rax, rbx\n";
             file << "    setge al\n";
+            file << "    movzx rax, al\n";
             push(file, "rax");
             if ((*lte)->cmp_pred.has_value()) {
                 ast_cmp_pred(file, (*lte)->cmp_pred.value());
@@ -219,6 +222,7 @@ public:
             pop(file, "rbx");
             file << "    cmp rax, rbx\n";
             file << "    setle al\n";
+            file << "    movzx rax, al\n";
             push(file, "rax");
             if ((*gte)->cmp_pred.has_value()) {
                 ast_cmp_pred(file, (*gte)->cmp_pred.value());
@@ -284,54 +288,39 @@ public:
         ast_stmt(file, stmt_pred->stmt);
     }
 
-    void ast_let(std::fstream& file, const ast::NodeLet* let)
-    {
-        if (!m_vars.contains(let->tok_ident->value)) {
-            ast_expr(file, let->expr);
-            m_vars.insert({ let->tok_ident->value, m_stack_loc });
-        }
-        else {
-            std::cerr << "[Error] Identifier already defined" << std::endl;
-            ::exit(EXIT_FAILURE);
-        }
-    }
-
-    void ast_eq(std::fstream& file, const ast::NodeEq* eq)
-    {
-        if (!m_vars.contains(eq->tok_ident->value)) {
-            std::cerr << "[Error] Unknown identifier" << std::endl;
-            ::exit(EXIT_FAILURE);
-        }
-        ast_expr(file, eq->expr);
-        pop(file, "rax");
-        file << "    mov QWORD [rsp + 8*" << m_stack_loc - m_vars.at(eq->tok_ident->value) << "], rax\n";
-    }
-
-    void ast_print(std::fstream& file, const ast::NodePrint* print)
-    {
-        ast_expr(file, print->expr);
-        pop(file, "rdi");
-        print_i64(file);
-        print_newline(file);
-    }
-
     void ast_stmt(std::fstream& file, const ast::NodeStmt* stmt)
     {
         file << "    ;; -- stmt --\n";
         if (auto stmt_print = std::get_if<ast::NodeStmtPrint*>(&stmt->var)) {
-            ast_print(file, (*stmt_print)->print);
+            ast_expr(file, (*stmt_print)->expr);
+            pop(file, "rdi");
+            print_i64(file);
+            print_newline(file);
             if ((*stmt_print)->stmt_pred.has_value()) {
                 ast_stmt_pred(file, (*stmt_print)->stmt_pred.value());
             }
         }
         else if (auto stmt_let = std::get_if<ast::NodeStmtLet*>(&stmt->var)) {
-            ast_let(file, (*stmt_let)->let);
+            if (!m_vars.contains((*stmt_let)->tok_ident->value)) {
+                ast_expr(file, (*stmt_let)->expr);
+                m_vars.insert({ (*stmt_let)->tok_ident->value, m_stack_loc });
+            }
+            else {
+                std::cerr << "[Error] Identifier already defined" << std::endl;
+                ::exit(EXIT_FAILURE);
+            }
             if ((*stmt_let)->stmt_pred.has_value()) {
                 ast_stmt_pred(file, (*stmt_let)->stmt_pred.value());
             }
         }
         else if (auto stmt_eq = std::get_if<ast::NodeStmtEq*>(&stmt->var)) {
-            ast_eq(file, (*stmt_eq)->eq);
+            if (!m_vars.contains((*stmt_eq)->tok_ident->value)) {
+                std::cerr << "[Error] Unknown identifier" << std::endl;
+                ::exit(EXIT_FAILURE);
+            }
+            ast_expr(file, (*stmt_eq)->expr);
+            pop(file, "rax");
+            file << "    mov QWORD [rsp + 8*" << m_stack_loc - m_vars.at((*stmt_eq)->tok_ident->value) << "], rax\n";
             if ((*stmt_eq)->stmt_pred.has_value()) {
                 ast_stmt_pred(file, (*stmt_eq)->stmt_pred.value());
             }
