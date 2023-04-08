@@ -21,6 +21,61 @@ enum class TokenType {
     gte
 };
 
+enum class BinAssoc { none, left, right };
+
+inline BinAssoc bin_assoc(TokenType type)
+{
+    switch (type) {
+    case TokenType::multi:
+    case TokenType::div:
+    case TokenType::add:
+    case TokenType::sub:
+    case TokenType::lt:
+    case TokenType::gt:
+    case TokenType::lte:
+    case TokenType::gte:
+        return BinAssoc::left;
+    default:
+        return BinAssoc::none;
+    }
+}
+
+inline int bin_prec(TokenType type)
+{
+    switch (type) {
+    case TokenType::multi:
+    case TokenType::div:
+        return 2;
+    case TokenType::add:
+    case TokenType::sub:
+        return 1;
+    case TokenType::lt:
+    case TokenType::gt:
+    case TokenType::lte:
+    case TokenType::gte:
+        return 0;
+    default:
+        return -1;
+    }
+}
+
+inline bool is_bin_op(TokenType type)
+{
+    switch (type) {
+    case TokenType::add:
+    case TokenType::sub:
+    case TokenType::multi:
+    case TokenType::div:
+    case TokenType::lt:
+    case TokenType::gt:
+    case TokenType::lte:
+    case TokenType::gte:
+        return true;
+    default:
+        return false;
+    }
+}
+
 std::string to_string(TokenType type)
 {
     switch (type) {

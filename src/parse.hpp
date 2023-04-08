@@ -12,222 +12,143 @@ public:
     {
     }
 
-    std::optional<ast::NodeFactor*> parse_factor()
+    std::optional<ast::NodeTerm*> parse_term()
     {
-        auto* factor = m_alloc.alloc<ast::NodeFactor>();
+        if (peak().has_value() && peak().value()->type == TokenType::sub) {
+            auto* neg = m_alloc.alloc<ast::NodeTermNeg>();
+            neg->tok_sign = consume();
+            if (auto term_base = parse_term_base()) {
+                neg->term_base = term_base.value();
+            }
+            else {
+                error("Expected term");
+            }
+            auto* term = m_alloc.alloc<ast::NodeTerm>();
+            term->var = neg;
+            return term;
+        }
+        else if (auto term_base = parse_term_base()) {
+            auto* term = m_alloc.alloc<ast::NodeTerm>();
+            term->var = term_base.value();
+            return term;
+        }
+        return {};
+    }
+
+    std::optional<ast::NodeTermBase*> parse_term_base()
+    {
         if (!peak().has_value()) {
             return {};
         }
+        auto* term_base = m_alloc.alloc<ast::NodeTermBase>();
         if (peak().value()->type == TokenType::left_paren) {
-            auto* node_paren = m_alloc.alloc<ast::NodeFactorParen>();
-            node_paren->tok_left_paren = consume();
-            if (auto ret = parse_expr()) {
-                node_paren->expr = ret.value();
+            auto* term_base_paren = m_alloc.alloc<ast::NodeTermBaseParen>();
+            term_base_paren->tok_left_paren = consume();
+            if (auto expr = parse_expr()) {
+                term_base_paren->expr = expr.value();
             }
             else {
                 error("Expected expression");
             }
             if (peak().has_value() && peak().value()->type == TokenType::right_paren) {
-                node_paren->tok_right_paren = consume();
+                term_base_paren->tok_right_paren = consume();
             }
             else {
                 error("Expected `)`");
             }
-            factor->var = node_paren;
-            return factor;
+            term_base->var = term_base_paren;
+            return term_base;
         }
         else if (peak().value()->type == TokenType::i64) {
-            auto* node_pos = m_alloc.alloc<ast::NodeFactorPos>();
-            node_pos->tok_num = consume();
-            factor->var = node_pos;
-            return factor;
-        }
-        else if (peak().value()->type == TokenType::sub) {
-            auto* node_neg = m_alloc.alloc<ast::NodeFactorNeg>();
-            node_neg->tok_sub = consume();
-            node_neg->tok_num = consume();
-            factor->var = node_neg;
-            return factor;
+            auto* term_base_num = m_alloc.alloc<ast::NodeTermBaseNum>();
+            term_base_num->tok_num = consume();
+            term_base->var = term_base_num;
+            return term_base;
         }
         else if (peak().value()->type == TokenType::ident) {
-            auto* node_ident = m_alloc.alloc<ast::NodeFactorIdent>();
-            node_ident->tok_ident = consume();
-            factor->var = node_ident;
-            return factor;
+            auto* term_base_ident = m_alloc.alloc<ast::NodeTermBaseIdent>();
+            term_base_ident->tok_ident = consume();
+            term_base->var = term_base_ident;
+            return term_base;
         }
         return {};
-    }
-
-    std::optional<ast::NodeExprPred*> parse_expr_pred()
-    {
-        auto* expr_pred = m_alloc.alloc<ast::NodeExprPred>();
-        if (!peak().has_value()) {
-            return {};
-        }
-        if (peak().value()->type == TokenType::add) {
-            auto* node_add = m_alloc.alloc<ast::NodeExprPredAdd>();
-            node_add->tok_add = consume();
-            if (auto ret = parse_term()) {
-                node_add->term = ret.value();
-            }
-            else {
-                error("Expected term");
-            }
-            node_add->expr_pred = parse_expr_pred();
-            expr_pred->var = node_add;
-            return expr_pred;
-        }
-        else if (peak().value()->type == TokenType::sub) {
-            auto* node_sub = m_alloc.alloc<ast::NodeExprPredSub>();
-            node_sub->tok_sub = consume();
-            node_sub->term = parse_term().value();
-            node_sub->expr_pred = parse_expr_pred();
-            expr_pred->var = node_sub;
-            return expr_pred;
-        }
-        return {};
-    }
-
-    std::optional<ast::NodeCmpPred*> parse_cmp_pred()
-    {
-        if (!peak().has_value()) {
-            return {};
-        }
-        auto* cmp_pred = m_alloc.alloc<ast::NodeCmpPred>();
-        if (peak().value()->type == TokenType::lt) {
-            auto* lt = m_alloc.alloc<ast::NodeCmpPredLt>();
-            lt->tok_lt = consume();
-            if (auto factor = parse_factor()) {
-                lt->factor = factor.value();
-            }
-            else {
-                error("Expected factor");
-            }
-            lt->cmp_pred = parse_cmp_pred();
-            cmp_pred->var = lt;
-            return cmp_pred;
-        }
-        else if (peak().value()->type == TokenType::gt) {
-            auto* gt = m_alloc.alloc<ast::NodeCmpPredGt>();
-            gt->tok_gt = consume();
-            if (auto factor = parse_factor()) {
-                gt->factor = factor.value();
-            }
-            else {
-                error("Expected factor");
-            }
-            gt->cmp_pred = parse_cmp_pred();
-            cmp_pred->var = gt;
-            return cmp_pred;
-        }
-        else if (peak().value()->type == TokenType::lte) {
-            auto* lte = m_alloc.alloc<ast::NodeCmpPredLte>();
-            lte->tok_lte = consume();
-            if (auto factor = parse_factor()) {
-                lte->factor = factor.value();
-            }
-            else {
-                error("Expected factor");
-            }
-            lte->cmp_pred = parse_cmp_pred();
-            cmp_pred->var = lte;
-            return cmp_pred;
-        }
-        else if (peak().value()->type == TokenType::gte) {
-            auto* gte = m_alloc.alloc<ast::NodeCmpPredGte>();
-            gte->tok_gte = consume();
-            if (auto factor = parse_factor()) {
-                gte->factor = factor.value();
-            }
-            else {
-                error("Expected factor");
-            }
-            gte->cmp_pred = parse_cmp_pred();
-            cmp_pred->var = gte;
-            return cmp_pred;
-        }
-        return {};
-    }
-
-    std::optional<ast::NodeCmp*> parse_cmp()
-    {
-        auto* cmp = m_alloc.alloc<ast::NodeCmp>();
-        if (auto factor = parse_factor()) {
-            cmp->factor = factor.value();
-        }
-        else {
-            return {};
-        }
-        cmp->cmp_pred = parse_cmp_pred();
-        return cmp;
-    }
-
-    std::optional<ast::NodeTermPred*> parse_term_pred()
-    {
-        auto* term_pred = m_alloc.alloc<ast::NodeTermPred>();
-        if (!peak().has_value()) {
-            return {};
-        }
-        if (peak().value()->type == TokenType::multi) {
-            auto* node_multi = m_alloc.alloc<ast::NodeTermPredMulti>();
-            node_multi->tok_multi = consume();
-            if (auto ret = parse_cmp()) {
-                node_multi->cmp = ret.value();
-            }
-            else {
-                error("Invalid");
-            }
-            node_multi->term_pred = parse_term_pred();
-            term_pred->var = node_multi;
-            return term_pred;
-        }
-        else if (peak().value()->type == TokenType::div) {
-            auto* node_div = m_alloc.alloc<ast::NodeTermPredDiv>();
-            node_div->tok_div = consume();
-            if (auto ret = parse_cmp()) {
-                node_div->cmp = ret.value();
-            }
-            else {
-                error("Invalid");
-            }
-            node_div->term_pred = parse_term_pred();
-            term_pred->var = node_div;
-            return term_pred;
-        }
-        return {};
-    }
-
-    std::optional<ast::NodeTerm*> parse_term()
-    {
-        auto* term = m_alloc.alloc<ast::NodeTerm>();
-        if (auto cmp = parse_cmp()) {
-            term->cmp = cmp.value();
-        }
-        else {
-            return {};
-        }
-        term->term_pred = parse_term_pred();
-        return term;
     }
 
     std::optional<ast::NodeExpr*> parse_expr()
     {
-        auto* expr = m_alloc.alloc<ast::NodeExpr>();
-        if (auto term = parse_term()) {
-            expr->term = term.value();
-        }
-        else {
+        auto term = parse_term();
+        if (!term.has_value()) {
             return {};
         }
-        expr->expr_pred = parse_expr_pred();
+        auto* expr = m_alloc.alloc<ast::NodeExpr>();
+        expr->var = term.value();
+        int last_prec = 0;
+        while (true) {
+            if (!peak().has_value() || !is_bin_op(peak().value()->type)) {
+                break;
+            }
+            const Token* last_op = peak().value();
+            auto* expr_bin = m_alloc.alloc<ast::NodeExprBin>();
+            if (bin_prec(peak().value()->type) <= last_prec) {
+                expr_bin->lhs = expr;
+                expr_bin->tok_op = consume();
+                if (auto rhs_term = parse_term()) {
+                    auto* rhs = m_alloc.alloc<ast::NodeExpr>();
+                    rhs->var = rhs_term.value();
+                    expr_bin->rhs = rhs;
+                    auto* new_expr = m_alloc.alloc<ast::NodeExpr>();
+                    new_expr->var = expr_bin;
+                    expr = new_expr;
+                }
+                else {
+                    error("Expected term");
+                }
+            }
+            else {
+                if (std::get_if<ast::NodeTerm*>(&expr->var)) {
+                    expr_bin->lhs = expr;
+                    expr_bin->tok_op = consume();
+                    if (auto rhs_term = parse_term()) {
+                        auto* rhs = m_alloc.alloc<ast::NodeExpr>();
+                        rhs->var = rhs_term.value();
+                        expr_bin->rhs = rhs;
+                        auto* new_expr = m_alloc.alloc<ast::NodeExpr>();
+                        new_expr->var = expr_bin;
+                        expr = new_expr;
+                    }
+                    else {
+                        error("Expected term");
+                    }
+                }
+                else if (auto node_expr = std::get_if<ast::NodeExprBin*>(&expr->var)) {
+                    expr_bin->lhs = (*node_expr)->rhs;
+                    expr_bin->tok_op = consume();
+                    if (auto rhs_term = parse_term()) {
+                        auto* rhs = m_alloc.alloc<ast::NodeExpr>();
+                        rhs->var = rhs_term.value();
+                        expr_bin->rhs = rhs;
+                        auto* new_expr = m_alloc.alloc<ast::NodeExpr>();
+                        new_expr->var = expr_bin;
+                        (*node_expr)->rhs = new_expr;
+                    }
+                    else {
+                        error("Expected term");
+                    }
+                }
+                else {
+                    // Unreachable
+                    assert(false);
+                }
+            }
+            last_prec = bin_prec(last_op->type);
+        }
         return expr;
     }
 
     std::optional<ast::NodeStmt*> parse_stmt()
     {
         auto* stmt = m_alloc.alloc<ast::NodeStmt>();
-        if (peak(2).has_value() && peak().value()->type == TokenType::ident
-            && peak(2).value()->type == TokenType::eq) {
+        if (peak(2).has_value() && peak().value()->type == TokenType::ident && peak(2).value()->type == TokenType::eq) {
             auto* stmt_eq = m_alloc.alloc<ast::NodeStmtEq>();
             stmt_eq->tok_ident = consume();
             stmt_eq->tok_eq = consume();
@@ -247,8 +168,9 @@ public:
             stmt->var = stmt_eq;
             return stmt;
         }
-        else if (peak(2).has_value() && peak().value()->type == TokenType::print
-                 && peak(2).value()->type == TokenType::left_paren) {
+        else if (
+            peak(2).has_value() && peak().value()->type == TokenType::print
+            && peak(2).value()->type == TokenType::left_paren) {
             auto print_stmt = m_alloc.alloc<ast::NodeStmtPrint>();
             print_stmt->tok_print = consume();
             print_stmt->tok_left_paren = consume();
@@ -274,8 +196,9 @@ public:
             stmt->var = print_stmt;
             return stmt;
         }
-        else if (peak(3).has_value() && peak().value()->type == TokenType::let && peak(2).value()->type == TokenType::ident
-                 && peak(3).value()->type == TokenType::eq) {
+        else if (
+            peak(3).has_value() && peak().value()->type == TokenType::let && peak(2).value()->type == TokenType::ident
+            && peak(3).value()->type == TokenType::eq) {
             auto* stmt_let = m_alloc.alloc<ast::NodeStmtLet>();
             stmt_let->tok_let = consume();
             stmt_let->tok_ident = consume();

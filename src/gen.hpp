@@ -126,20 +126,82 @@ public:
         file << "    syscall\n";
     }
 
-    void ast_factor(std::fstream& file, const ast::NodeFactor* factor)
+    void ast_expr_bin(std::fstream& file, const ast::NodeExprBin* expr_bin)
     {
-        if (auto* node_paren = std::get_if<ast::NodeFactorParen*>(&factor->var)) {
+        ast_expr(file, expr_bin->lhs);
+        ast_expr(file, expr_bin->rhs);
+        if (expr_bin->tok_op->type == TokenType::multi) {
+            pop(file, "rax");
+            pop(file, "rbx");
+            file << "    imul rbx\n";
+            push(file, "rax");
+        }
+        else if (expr_bin->tok_op->type == TokenType::div) {
+            pop(file, "rbx");
+            pop(file, "rax");
+            file << "    cqo\n";
+            file << "    idiv rbx\n";
+            push(file, "rax");
+        }
+        else if (expr_bin->tok_op->type == TokenType::add) {
+            pop(file, "rax");
+            pop(file, "rbx");
+            file << "    add rax, rbx\n";
+            push(file, "rax");
+        }
+        else if (expr_bin->tok_op->type == TokenType::sub) {
+            pop(file, "rcx");
+            pop(file, "rdx");
+            file << "    sub rdx, rcx\n";
+            push(file, "rdx");
+        }
+        else if (expr_bin->tok_op->type == TokenType::lt) {
+            pop(file, "rax");
+            pop(file, "rbx");
+            file << "    cmp rax, rbx\n";
+            file << "    setg al\n";
+            file << "    movzx rax, al\n";
+            push(file, "rax");
+        }
+        else if (expr_bin->tok_op->type == TokenType::gt) {
+            pop(file, "rax");
+            pop(file, "rbx");
+            file << "    cmp rax, rbx\n";
+            file << "    setl al\n";
+            file << "    movzx rax, al\n";
+            push(file, "rax");
+        }
+        else if (expr_bin->tok_op->type == TokenType::lte) {
+            pop(file, "rax");
+            pop(file, "rbx");
+            file << "    cmp rax, rbx\n";
+            file << "    setge al\n";
+            file << "    movzx rax, al\n";
+            push(file, "rax");
+        }
+        else if (expr_bin->tok_op->type == TokenType::gte) {
+            pop(file, "rax");
+            pop(file, "rbx");
+            file << "    cmp rax, rbx\n";
+            file << "    setle al\n";
+            file << "    movzx rax, al\n";
+            push(file, "rax");
+        }
+        else {
+            // Unreachable
+            assert(false);
+        }
+    }
+
+    void ast_term_base(std::fstream& file, const ast::NodeTermBase* term_base)
+    {
+        if (auto* node_paren = std::get_if<ast::NodeTermBaseParen*>(&term_base->var)) {
             ast_expr(file, (*node_paren)->expr);
         }
-        else if (auto node_pos = std::get_if<ast::NodeFactorPos*>(&factor->var)) {
-            push(file, (*node_pos)->tok_num->value);
+        else if (auto node_num = std::get_if<ast::NodeTermBaseNum*>(&term_base->var)) {
+            push(file, (*node_num)->tok_num->value);
         }
-        else if (auto node_neg = std::get_if<ast::NodeFactorNeg*>(&factor->var)) {
-            file << "    mov rcx, " << std::stoul((*node_neg)->tok_num->value) << "\n";
-            file << "    neg rcx\n";
-            push(file, "rcx");
-        }
-        else if (auto node_ident = std::get_if<ast::NodeFactorIdent*>(&factor->var)) {
+        else if (auto node_ident = std::get_if<ast::NodeTermBaseIdent*>(&term_base->var)) {
             if (!m_vars.contains((*node_ident)->tok_ident->value)) {
                 std::cerr << "[Error] Undefined identifier" << std::endl;
                 ::exit(EXIT_FAILURE);
@@ -154,79 +216,16 @@ public:
         }
     }
 
-    void ast_expr_pred(std::fstream& file, const ast::NodeExprPred* expr_pred)
+    void ast_term(std::fstream& file, const ast::NodeTerm* term)
     {
-        if (auto node_add = std::get_if<ast::NodeExprPredAdd*>(&expr_pred->var)) {
-            ast_term(file, (*node_add)->term);
-            pop(file, "rcx");
-            pop(file, "rdx");
-            file << "    add rdx, rcx\n";
-            push(file, "rdx");
-            if ((*node_add)->expr_pred.has_value()) {
-                ast_expr_pred(file, (*node_add)->expr_pred.value());
-            }
-        }
-        else if (auto node_sub = std::get_if<ast::NodeExprPredSub*>(&expr_pred->var)) {
-            ast_term(file, (*node_sub)->term);
-            pop(file, "rcx");
-            pop(file, "rdx");
-            file << "    sub rdx, rcx\n";
-            push(file, "rdx");
-            if ((*node_sub)->expr_pred.has_value()) {
-                ast_expr_pred(file, (*node_sub)->expr_pred.value());
-            }
-        }
-    }
-
-    void ast_cmp_pred(std::fstream& file, const ast::NodeCmpPred* cmp_pred)
-    {
-        if (auto lt = std::get_if<ast::NodeCmpPredLt*>(&cmp_pred->var)) {
-            ast_factor(file, (*lt)->factor);
+        if (auto node_neg = std::get_if<ast::NodeTermNeg*>(&term->var)) {
+            ast_term_base(file, (*node_neg)->term_base);
             pop(file, "rax");
-            pop(file, "rbx");
-            file << "    cmp rax, rbx\n";
-            file << "    setg al\n";
-            file << "    movzx rax, al\n";
+            file << "    neg rax\n";
             push(file, "rax");
-            if ((*lt)->cmp_pred.has_value()) {
-                ast_cmp_pred(file, (*lt)->cmp_pred.value());
-            }
         }
-        else if (auto gt = std::get_if<ast::NodeCmpPredGt*>(&cmp_pred->var)) {
-            ast_factor(file, (*gt)->factor);
-            pop(file, "rax");
-            pop(file, "rbx");
-            file << "    cmp rax, rbx\n";
-            file << "    setl al\n";
-            file << "    movzx rax, al\n";
-            push(file, "rax");
-            if ((*gt)->cmp_pred.has_value()) {
-                ast_cmp_pred(file, (*gt)->cmp_pred.value());
-            }
-        }
-        else if (auto lte = std::get_if<ast::NodeCmpPredLte*>(&cmp_pred->var)) {
-            ast_factor(file, (*lte)->factor);
-            pop(file, "rax");
-            pop(file, "rbx");
-            file << "    cmp rax, rbx\n";
-            file << "    setge al\n";
-            file << "    movzx rax, al\n";
-            push(file, "rax");
-            if ((*lte)->cmp_pred.has_value()) {
-                ast_cmp_pred(file, (*lte)->cmp_pred.value());
-            }
-        }
-        else if (auto gte = std::get_if<ast::NodeCmpPredGte*>(&cmp_pred->var)) {
-            ast_factor(file, (*gte)->factor);
-            pop(file, "rax");
-            pop(file, "rbx");
-            file << "    cmp rax, rbx\n";
-            file << "    setle al\n";
-            file << "    movzx rax, al\n";
-            push(file, "rax");
-            if ((*gte)->cmp_pred.has_value()) {
-                ast_cmp_pred(file, (*gte)->cmp_pred.value());
-            }
+        else if (auto node_base = std::get_if<ast::NodeTermBase*>(&term->var)) {
+            ast_term_base(file, (*node_base));
         }
         else {
             // Unreachable
@@ -234,52 +233,17 @@ public:
         }
     }
 
-    void ast_cmp(std::fstream& file, const ast::NodeCmp* cmp)
-    {
-        ast_factor(file, cmp->factor);
-        if (cmp->cmp_pred.has_value()) {
-            ast_cmp_pred(file, cmp->cmp_pred.value());
-        }
-    }
-
-    void ast_term_pred(std::fstream& file, const ast::NodeTermPred* term_pred)
-    {
-        if (auto node_multi = std::get_if<ast::NodeTermPredMulti*>(&term_pred->var)) {
-            ast_cmp(file, (*node_multi)->cmp);
-            pop(file, "rax");
-            pop(file, "rcx");
-            file << "    imul rcx\n";
-            push(file, "rax");
-            if ((*node_multi)->term_pred.has_value()) {
-                ast_term_pred(file, (*node_multi)->term_pred.value());
-            }
-        }
-        else if (auto node_div = std::get_if<ast::NodeTermPredDiv*>(&term_pred->var)) {
-            ast_cmp(file, (*node_div)->cmp);
-            pop(file, "rcx");
-            pop(file, "rax");
-            file << "    cqo\n";
-            file << "    idiv rcx\n";
-            push(file, "rax");
-            if ((*node_div)->term_pred.has_value()) {
-                ast_term_pred(file, (*node_div)->term_pred.value());
-            }
-        }
-    }
-
-    void ast_term(std::fstream& file, const ast::NodeTerm* term)
-    {
-        ast_cmp(file, term->cmp);
-        if (term->term_pred.has_value()) {
-            ast_term_pred(file, term->term_pred.value());
-        }
-    }
-
     void ast_expr(std::fstream& file, const ast::NodeExpr* expr)
     {
-        ast_term(file, expr->term);
-        if (expr->expr_pred.has_value()) {
-            ast_expr_pred(file, expr->expr_pred.value());
+        if (auto term = std::get_if<ast::NodeTerm*>(&expr->var)) {
+            ast_term(file, (*term));
+        }
+        else if (auto expr_bin = std::get_if<ast::NodeExprBin*>(&expr->var)) {
+            ast_expr_bin(file, (*expr_bin));
+        }
+        else {
+            // Unreachable
+            assert(false);
         }
     }
 

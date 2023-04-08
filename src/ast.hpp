@@ -8,108 +8,42 @@ namespace ast {
 
 struct NodeExpr;
 
-struct NodeFactorParen {
+struct NodeTermBaseParen {
     const Token* tok_left_paren;
     NodeExpr* expr;
     const Token* tok_right_paren;
 };
 
-struct NodeFactorPos {
+struct NodeTermBaseNum {
     const Token* tok_num;
 };
 
-struct NodeFactorNeg {
-    const Token* tok_sub;
-    const Token* tok_num;
-};
-
-struct NodeFactorIdent {
+struct NodeTermBaseIdent {
     const Token* tok_ident;
 };
 
-struct NodeFactor {
-    std::variant<NodeFactorParen*, NodeFactorPos*, NodeFactorNeg*, NodeFactorIdent*> var;
+
+struct NodeTermBase {
+    std::variant<NodeTermBaseParen*, NodeTermBaseNum*, NodeTermBaseIdent*> var;
 };
 
-struct NodeCmpPred;
-
-struct NodeCmpPredLt {
-    const Token* tok_lt;
-    NodeFactor* factor;
-    std::optional<NodeCmpPred*> cmp_pred;
-};
-
-struct NodeCmpPredGt {
-    const Token* tok_gt;
-    NodeFactor* factor;
-    std::optional<NodeCmpPred*> cmp_pred;
-};
-
-struct NodeCmpPredLte {
-    const Token* tok_lte;
-    NodeFactor* factor;
-    std::optional<NodeCmpPred*> cmp_pred;
-};
-
-struct NodeCmpPredGte {
-    const Token* tok_gte;
-    NodeFactor* factor;
-    std::optional<NodeCmpPred*> cmp_pred;
-};
-
-struct NodeCmpPred {
-    std::variant<NodeCmpPredLt*, NodeCmpPredGt*, NodeCmpPredLte*, NodeCmpPredGte*> var;
-};
-
-struct NodeCmp {
-    NodeFactor* factor;
-    std::optional<NodeCmpPred*> cmp_pred;
-};
-
-struct NodeTermPred;
-
-struct NodeTermPredMulti {
-    const Token* tok_multi;
-    NodeCmp* cmp;
-    std::optional<NodeTermPred*> term_pred;
-};
-
-struct NodeTermPredDiv {
-    const Token* tok_div;
-    NodeCmp* cmp;
-    std::optional<NodeTermPred*> term_pred;
-};
-
-struct NodeTermPred {
-    std::variant<NodeTermPredMulti*, NodeTermPredDiv*> var;
+struct NodeTermNeg {
+    const Token* tok_sign;
+    NodeTermBase* term_base;
 };
 
 struct NodeTerm {
-    NodeCmp* cmp;
-    std::optional<NodeTermPred*> term_pred;
+    std::variant<NodeTermNeg*, NodeTermBase*> var;
 };
 
-struct NodeExprPred;
-
-struct NodeExprPredAdd {
-    const Token* tok_add;
-    NodeTerm* term;
-    std::optional<NodeExprPred*> expr_pred;
-};
-
-struct NodeExprPredSub {
-    const Token* tok_sub;
-    NodeTerm* term;
-    std::optional<NodeExprPred*> expr_pred;
-};
-
-struct NodeExprPred {
-    std::variant<NodeExprPredAdd*, NodeExprPredSub*> var;
+struct NodeExprBin {
+    NodeExpr* lhs;
+    const Token* tok_op;
+    NodeExpr* rhs;
 };
 
 struct NodeExpr {
-    NodeTerm* term;
-    std::optional<NodeExprPred*> expr_pred;
+    std::variant<NodeTerm*, NodeExprBin*> var;
 };
 
 struct NodeStmt;
