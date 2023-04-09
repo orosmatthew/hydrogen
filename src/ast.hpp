@@ -22,7 +22,6 @@ struct NodeTermBaseIdent {
     const Token* tok_ident;
 };
 
-
 struct NodeTermBase {
     std::variant<NodeTermBaseParen*, NodeTermBaseNum*, NodeTermBaseIdent*> var;
 };
@@ -78,8 +77,27 @@ struct NodeStmtPrint {
     std::optional<NodeStmtPred*> stmt_pred;
 };
 
+struct NodeElse {
+    const Token* tok_else;
+    const Token* tok_left_curly;
+    NodeStmt* stmt;
+    const Token* tok_right_curly;
+};
+
+struct NodeStmtIf {
+    const Token* tok_if;
+    const Token* tok_left_paren;
+    NodeExpr* expr;
+    const Token* tok_right_paren;
+    const Token* tok_left_curly;
+    NodeStmt* stmt;
+    const Token* tok_right_curly;
+    std::optional<NodeElse*> else_;
+    std::optional<NodeStmtPred*> stmt_pred;
+};
+
 struct NodeStmt {
-    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*> var;
+    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*, NodeStmtIf*> var;
 };
 
 // TODO

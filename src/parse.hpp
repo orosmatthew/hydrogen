@@ -145,6 +145,30 @@ public:
         return expr;
     }
 
+    std::optional<ast::NodeElse*> parse_else()
+    {
+        if (peak(2).has_value() && peak().value()->type == TokenType::else_
+            && peak(2).value()->type == TokenType::left_curly) {
+            auto* else_ = m_alloc.alloc<ast::NodeElse>();
+            else_->tok_else = consume();
+            else_->tok_left_curly = consume();
+            if (auto stmt = parse_stmt()) {
+                else_->stmt = stmt.value();
+            }
+            else {
+                error("Expected statement");
+            }
+            if (peak().has_value() && peak().value()->type == TokenType::right_curly) {
+                else_->tok_right_curly = consume();
+            }
+            else {
+                error("Expected `}`");
+            }
+            return else_;
+        }
+        return {};
+    }
+
     std::optional<ast::NodeStmt*> parse_stmt()
     {
         auto* stmt = m_alloc.alloc<ast::NodeStmt>();
@@ -217,6 +241,47 @@ public:
             }
             stmt_let->stmt_pred = parse_stmt_pred();
             stmt->var = stmt_let;
+            return stmt;
+        }
+        else if (
+            peak(2).has_value() && peak().value()->type == TokenType::if_
+            && peak(2).value()->type == TokenType::left_paren) {
+            auto* stmt_if = m_alloc.alloc<ast::NodeStmtIf>();
+            stmt_if->tok_if = consume();
+            stmt_if->tok_left_paren = consume();
+            if (auto expr = parse_expr()) {
+                stmt_if->expr = expr.value();
+            }
+            else {
+                error("Expected expression");
+            }
+            if (peak().has_value() && peak().value()->type == TokenType::right_paren) {
+                stmt_if->tok_right_paren = consume();
+            }
+            else {
+                error("Expected `)`");
+            }
+            if (peak().has_value() && peak().value()->type == TokenType::left_curly) {
+                stmt_if->tok_left_curly = consume();
+            }
+            else {
+                error("Expected `{`");
+            }
+            if (auto node_stmt = parse_stmt()) {
+                stmt_if->stmt = node_stmt.value();
+            }
+            else {
+                error("Expected statement");
+            }
+            if (peak().has_value() && peak().value()->type == TokenType::right_curly) {
+                stmt_if->tok_right_curly = consume();
+            }
+            else {
+                error("Expected `}`");
+            }
+            stmt_if->else_ = parse_else();
+            stmt_if->stmt_pred = parse_stmt_pred();
+            stmt->var = stmt_if;
             return stmt;
         }
         return {};

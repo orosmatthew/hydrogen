@@ -18,7 +18,11 @@ enum class TokenType {
     lt,
     gt,
     lte,
-    gte
+    gte,
+    if_,
+    else_,
+    left_curly,
+    right_curly
 };
 
 enum class BinAssoc { none, left, right };
@@ -133,18 +137,24 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             i--;
             tokens.push_back({ TokenType::i64, num_buf });
         }
-        else if (isalpha(source[i])) {
+        else if (isalpha(source[i]) || source[i] == '_') {
             std::string buf;
             do {
                 buf.push_back(source[i]);
                 i++;
-            } while (isalnum(source[i]));
+            } while (isalnum(source[i]) || source[i] == '_');
             i--;
             if (buf == "let") {
                 tokens.push_back({ TokenType::let, buf });
             }
             else if (buf == "print") {
                 tokens.push_back({ TokenType::print, buf });
+            }
+            else if (buf == "if") {
+                tokens.push_back({ TokenType::if_, buf });
+            }
+            else if (buf == "else") {
+                tokens.push_back({ TokenType::else_, buf });
             }
             else {
                 tokens.push_back({ TokenType::ident, buf });
@@ -191,6 +201,12 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             else {
                 tokens.push_back({ TokenType::gt, ">" });
             }
+        }
+        else if (source[i] == '{') {
+            tokens.push_back({ TokenType::left_curly, "{" });
+        }
+        else if (source[i] == '}') {
+            tokens.push_back({ TokenType::right_curly, "}" });
         }
         else if (source[i] != ' ' && source[i] != '\n' && source[i] != '\r') {
             std::cerr << "[Error] Unexpected token: `" << source[i] << "`" << std::endl;

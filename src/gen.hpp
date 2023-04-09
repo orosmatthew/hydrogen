@@ -9,6 +9,7 @@ public:
     explicit Generator(std::fstream& file)
         : m_file(file)
         , m_stack_loc(0)
+        , m_label_count(0)
     {
     }
 
@@ -128,8 +129,8 @@ public:
 
     void ast_expr_bin(const ast::NodeExprBin* expr_bin)
     {
-        ast_expr( expr_bin->lhs);
-        ast_expr( expr_bin->rhs);
+        ast_expr(expr_bin->lhs);
+        ast_expr(expr_bin->rhs);
         if (expr_bin->tok_op->type == TokenType::multi) {
             pop("rax");
             pop("rbx");
@@ -289,6 +290,27 @@ public:
                 ast_stmt_pred((*stmt_eq)->stmt_pred.value());
             }
         }
+        else if (auto stmt_if = std::get_if<ast::NodeStmtIf*>(&stmt->var)) {
+            ast_expr((*stmt_if)->expr);
+            const std::string else_label = get_next_label();
+            pop("rax");
+            m_file << "    test rax, rax\n";
+            m_file << "    jz " << else_label << "\n";
+            ast_stmt((*stmt_if)->stmt);
+            if ((*stmt_if)->else_.has_value()) {
+                const std::string end_label = get_next_label();
+                m_file << "    jmp " << end_label << "\n";
+                m_file << else_label << ":\n";
+                ast_stmt((*stmt_if)->else_.value()->stmt);
+                m_file << end_label << ":\n";
+            }
+            else {
+                m_file << else_label << ":\n";
+            }
+            if ((*stmt_if)->stmt_pred.has_value()) {
+                ast_stmt_pred((*stmt_if)->stmt_pred.value());
+            }
+        }
         else {
             // Unreachable
             assert(false);
@@ -307,8 +329,14 @@ public:
         m_stack_loc--;
     }
 
+    std::string get_next_label()
+    {
+        return ".L" + std::to_string(m_label_count++);
+    }
+
 private:
     std::fstream& m_file;
     int m_stack_loc;
     std::unordered_map<std::string, int> m_vars {};
+    int m_label_count;
 };
