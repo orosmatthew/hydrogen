@@ -188,6 +188,22 @@ public:
             m_file << "    movzx rax, al\n";
             push("rax");
         }
+        else if (expr_bin->tok_op->type == TokenType::deq) {
+            pop("rax");
+            pop("rbx");
+            m_file << "    cmp rax, rbx\n";
+            m_file << "    sete al\n";
+            m_file << "    movzx rax, al\n";
+            push("rax");
+        }
+        else if (expr_bin->tok_op->type == TokenType::neq) {
+            pop("rax");
+            pop("rbx");
+            m_file << "    cmp rax, rbx\n";
+            m_file << "    setne al\n";
+            m_file << "    movzx rax, al\n";
+            push("rax");
+        }
         else {
             // Unreachable
             assert(false);

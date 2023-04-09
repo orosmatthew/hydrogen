@@ -22,7 +22,9 @@ enum class TokenType {
     if_,
     else_,
     left_curly,
-    right_curly
+    right_curly,
+    deq,
+    neq,
 };
 
 enum class BinAssoc { none, left, right };
@@ -49,14 +51,16 @@ inline int bin_prec(TokenType type)
     switch (type) {
     case TokenType::multi:
     case TokenType::div:
-        return 2;
+        return 3;
     case TokenType::add:
     case TokenType::sub:
-        return 1;
+        return 2;
     case TokenType::lt:
     case TokenType::gt:
     case TokenType::lte:
     case TokenType::gte:
+        return 1;
+    case TokenType::deq:
         return 0;
     default:
         return -1;
@@ -74,6 +78,8 @@ inline bool is_bin_op(TokenType type)
     case TokenType::gt:
     case TokenType::lte:
     case TokenType::gte:
+    case TokenType::deq:
+    case TokenType::neq:
         return true;
     default:
         return false;
@@ -182,7 +188,13 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             tokens.push_back({ TokenType::semi, ";" });
         }
         else if (source[i] == '=') {
-            tokens.push_back({ TokenType::eq, "=" });
+            if (source[i + 1] == '=') {
+                tokens.push_back({ TokenType::deq, "==" });
+                i++;
+            }
+            else {
+                tokens.push_back({ TokenType::eq, "=" });
+            }
         }
         else if (source[i] == '<') {
             if (source[i + 1] == '=') {
@@ -207,6 +219,10 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
         }
         else if (source[i] == '}') {
             tokens.push_back({ TokenType::right_curly, "}" });
+        }
+        else if (source[i] == '!' && source[i + 1] == '=') {
+            tokens.push_back({ TokenType::neq, "!=" });
+            i++;
         }
         else if (source[i] != ' ' && source[i] != '\n' && source[i] != '\r') {
             std::cerr << "[Error] Unexpected token: `" << source[i] << "`" << std::endl;
