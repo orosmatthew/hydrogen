@@ -48,13 +48,13 @@ int main(int argc, const char* argv[])
     {
         std::fstream file((input_dir / (input_filename + ".asm")), std::ios::out);
 
-        Generator gen;
-        Generator::print_u64_def(file);
-        Generator::print_i64_def(file);
-        Generator::start(file);
+        Generator gen(file);
+        gen.print_u64_def();
+        gen.print_i64_def();
+        gen.start();
         {
-            gen.ast_stmt(file, root);
-            Generator::exit(file);
+            gen.ast_stmt(root);
+            gen.exit();
         }
     }
 
