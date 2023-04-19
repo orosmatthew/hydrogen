@@ -47,17 +47,13 @@ struct NodeExpr {
 
 struct NodeStmt;
 
-struct NodeStmtPred {
-    NodeStmt* stmt;
-};
-
 struct NodeStmtLet {
     const Token* tok_let;
     const Token* tok_ident;
     const Token* tok_eq;
     NodeExpr* expr;
     const Token* tok_semi;
-    std::optional<NodeStmtPred*> stmt_pred;
+    std::optional<NodeStmt*> next_stmt;
 };
 
 struct NodeStmtEq {
@@ -65,7 +61,7 @@ struct NodeStmtEq {
     const Token* tok_eq;
     const NodeExpr* expr;
     const Token* tok_semi;
-    std::optional<NodeStmtPred*> stmt_pred;
+    std::optional<NodeStmt*> next_stmt;
 };
 
 struct NodeStmtPrint {
@@ -74,14 +70,18 @@ struct NodeStmtPrint {
     NodeExpr* expr;
     const Token* tok_right_paren;
     const Token* tok_semi;
-    std::optional<NodeStmtPred*> stmt_pred;
+    std::optional<NodeStmt*> next_stmt;
+};
+
+struct NodeScope {
+    const Token* tok_left_curly;
+    std::optional<NodeStmt*> stmt;
+    const Token* tok_right_curly;
 };
 
 struct NodeElse {
     const Token* tok_else;
-    const Token* tok_left_curly;
-    NodeStmt* stmt;
-    const Token* tok_right_curly;
+    NodeScope* scope;
 };
 
 struct NodeStmtIf {
@@ -89,11 +89,9 @@ struct NodeStmtIf {
     const Token* tok_left_paren;
     NodeExpr* expr;
     const Token* tok_right_paren;
-    const Token* tok_left_curly;
-    NodeStmt* stmt;
-    const Token* tok_right_curly;
+    NodeScope* scope;
     std::optional<NodeElse*> else_;
-    std::optional<NodeStmtPred*> stmt_pred;
+    std::optional<NodeStmt*> next_stmt;
 };
 
 struct NodeStmt {

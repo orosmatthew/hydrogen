@@ -145,24 +145,33 @@ public:
         return expr;
     }
 
-    std::optional<ast::NodeElse*> parse_else()
+    std::optional<ast::NodeScope*> parse_scope()
     {
-        if (peak(2).has_value() && peak().value()->type == TokenType::else_
-            && peak(2).value()->type == TokenType::left_curly) {
-            auto* else_ = m_alloc.alloc<ast::NodeElse>();
-            else_->tok_else = consume();
-            else_->tok_left_curly = consume();
-            if (auto stmt = parse_stmt()) {
-                else_->stmt = stmt.value();
-            }
-            else {
-                error("Expected statement");
-            }
+        if (peak().has_value() && peak().value()->type == TokenType::left_curly) {
+            auto* scope = m_alloc.alloc<ast::NodeScope>();
+            scope->tok_left_curly = consume();
+            scope->stmt = parse_stmt();
             if (peak().has_value() && peak().value()->type == TokenType::right_curly) {
-                else_->tok_right_curly = consume();
+                scope->tok_right_curly = consume();
             }
             else {
                 error("Expected `}`");
+            }
+            return scope;
+        }
+        return {};
+    }
+
+    std::optional<ast::NodeElse*> parse_else()
+    {
+        if (peak().has_value() && peak().value()->type == TokenType::else_) {
+            auto* else_ = m_alloc.alloc<ast::NodeElse>();
+            else_->tok_else = consume();
+            if (auto scope = parse_scope()) {
+                else_->scope = scope.value();
+            }
+            else {
+                error("Expected scope with `{` and `}`");
             }
             return else_;
         }
@@ -188,7 +197,7 @@ public:
             else {
                 error("Expected `;`");
             }
-            stmt_eq->stmt_pred = parse_stmt_pred();
+            stmt_eq->next_stmt = parse_stmt();
             stmt->var = stmt_eq;
             return stmt;
         }
@@ -216,7 +225,7 @@ public:
             else {
                 error("Expected `;`");
             }
-            print_stmt->stmt_pred = parse_stmt_pred();
+            print_stmt->next_stmt = parse_stmt();
             stmt->var = print_stmt;
             return stmt;
         }
@@ -239,7 +248,7 @@ public:
             else {
                 error("Expected `;`");
             }
-            stmt_let->stmt_pred = parse_stmt_pred();
+            stmt_let->next_stmt = parse_stmt();
             stmt->var = stmt_let;
             return stmt;
         }
@@ -261,41 +270,18 @@ public:
             else {
                 error("Expected `)`");
             }
-            if (peak().has_value() && peak().value()->type == TokenType::left_curly) {
-                stmt_if->tok_left_curly = consume();
+            if (auto scope = parse_scope()) {
+                stmt_if->scope = scope.value();
             }
             else {
-                error("Expected `{`");
-            }
-            if (auto node_stmt = parse_stmt()) {
-                stmt_if->stmt = node_stmt.value();
-            }
-            else {
-                error("Expected statement");
-            }
-            if (peak().has_value() && peak().value()->type == TokenType::right_curly) {
-                stmt_if->tok_right_curly = consume();
-            }
-            else {
-                error("Expected `}`");
+                error("Expected scope with `{` and `}`");
             }
             stmt_if->else_ = parse_else();
-            stmt_if->stmt_pred = parse_stmt_pred();
+            stmt_if->next_stmt = parse_stmt();
             stmt->var = stmt_if;
             return stmt;
         }
         return {};
-    }
-
-    std::optional<ast::NodeStmtPred*> parse_stmt_pred()
-    {
-        auto stmt_pred = m_alloc.alloc<ast::NodeStmtPred>();
-        auto ret = parse_stmt();
-        if (!ret.has_value()) {
-            return {};
-        }
-        stmt_pred->stmt = ret.value();
-        return stmt_pred;
     }
 
 private:

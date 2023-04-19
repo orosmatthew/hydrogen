@@ -264,9 +264,12 @@ public:
         }
     }
 
-    void ast_stmt_pred(const ast::NodeStmtPred* stmt_pred)
+    void ast_scope(const ast::NodeScope* scope)
     {
-        ast_stmt(stmt_pred->stmt);
+        // TODO: properly scope variables
+        if (scope->stmt.has_value()) {
+            ast_stmt(scope->stmt.value());
+        }
     }
 
     void ast_stmt(const ast::NodeStmt* stmt)
@@ -277,8 +280,8 @@ public:
             pop("rdi");
             print_i64();
             print_newline();
-            if ((*stmt_print)->stmt_pred.has_value()) {
-                ast_stmt_pred((*stmt_print)->stmt_pred.value());
+            if ((*stmt_print)->next_stmt.has_value()) {
+                ast_stmt((*stmt_print)->next_stmt.value());
             }
         }
         else if (auto stmt_let = std::get_if<ast::NodeStmtLet*>(&stmt->var)) {
@@ -290,8 +293,8 @@ public:
                 std::cerr << "[Error] Identifier already defined" << std::endl;
                 ::exit(EXIT_FAILURE);
             }
-            if ((*stmt_let)->stmt_pred.has_value()) {
-                ast_stmt_pred((*stmt_let)->stmt_pred.value());
+            if ((*stmt_let)->next_stmt.has_value()) {
+                ast_stmt((*stmt_let)->next_stmt.value());
             }
         }
         else if (auto stmt_eq = std::get_if<ast::NodeStmtEq*>(&stmt->var)) {
@@ -302,8 +305,8 @@ public:
             ast_expr((*stmt_eq)->expr);
             pop("rax");
             m_file << "    mov QWORD [rsp + 8*" << m_stack_loc - m_vars.at((*stmt_eq)->tok_ident->value) << "], rax\n";
-            if ((*stmt_eq)->stmt_pred.has_value()) {
-                ast_stmt_pred((*stmt_eq)->stmt_pred.value());
+            if ((*stmt_eq)->next_stmt.has_value()) {
+                ast_stmt((*stmt_eq)->next_stmt.value());
             }
         }
         else if (auto stmt_if = std::get_if<ast::NodeStmtIf*>(&stmt->var)) {
@@ -312,19 +315,19 @@ public:
             pop("rax");
             m_file << "    test rax, rax\n";
             m_file << "    jz " << else_label << "\n";
-            ast_stmt((*stmt_if)->stmt);
+            ast_scope((*stmt_if)->scope);
             if ((*stmt_if)->else_.has_value()) {
                 const std::string end_label = get_next_label();
                 m_file << "    jmp " << end_label << "\n";
                 m_file << else_label << ":\n";
-                ast_stmt((*stmt_if)->else_.value()->stmt);
+                ast_scope((*stmt_if)->else_.value()->scope);
                 m_file << end_label << ":\n";
             }
             else {
                 m_file << else_label << ":\n";
             }
-            if ((*stmt_if)->stmt_pred.has_value()) {
-                ast_stmt_pred((*stmt_if)->stmt_pred.value());
+            if ((*stmt_if)->next_stmt.has_value()) {
+                ast_stmt((*stmt_if)->next_stmt.value());
             }
         }
         else {
