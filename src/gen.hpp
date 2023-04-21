@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cassert>
+#include <stack>
+
 #include "ast.hpp"
 #include "token.hpp"
-#include <cassert>
 
 class Generator {
 public:
@@ -219,12 +221,13 @@ public:
             push((*node_num)->tok_num->value);
         }
         else if (auto node_ident = std::get_if<ast::NodeTermBaseIdent*>(&term_base->var)) {
-            if (!m_vars.contains((*node_ident)->tok_ident->value)) {
+            if (!m_vars_lookup.contains((*node_ident)->tok_ident->value)) {
                 std::cerr << "[Error] Undefined identifier" << std::endl;
                 ::exit(EXIT_FAILURE);
             }
             std::stringstream str;
-            str << "QWORD [rsp + 8*" << m_stack_loc - m_vars.at((*node_ident)->tok_ident->value) << "]";
+            str << "QWORD [rsp + 8*" << m_stack_loc - m_vars_lookup.at((*node_ident)->tok_ident->value)->stack_offset
+                << "]";
             push(str.str());
         }
         else {
@@ -266,10 +269,11 @@ public:
 
     void ast_scope(const ast::NodeScope* scope)
     {
-        // TODO: properly scope variables
+        begin_scope();
         if (scope->stmt.has_value()) {
             ast_stmt(scope->stmt.value());
         }
+        end_scope();
     }
 
     void ast_stmt(const ast::NodeStmt* stmt)
@@ -285,9 +289,9 @@ public:
             }
         }
         else if (auto stmt_let = std::get_if<ast::NodeStmtLet*>(&stmt->var)) {
-            if (!m_vars.contains((*stmt_let)->tok_ident->value)) {
+            if (!m_vars_lookup.contains((*stmt_let)->tok_ident->value)) {
                 ast_expr((*stmt_let)->expr);
-                m_vars.insert({ (*stmt_let)->tok_ident->value, m_stack_loc });
+                push_var((*stmt_let)->tok_ident->value);
             }
             else {
                 std::cerr << "[Error] Identifier already defined" << std::endl;
@@ -298,13 +302,14 @@ public:
             }
         }
         else if (auto stmt_eq = std::get_if<ast::NodeStmtEq*>(&stmt->var)) {
-            if (!m_vars.contains((*stmt_eq)->tok_ident->value)) {
+            if (!m_vars_lookup.contains((*stmt_eq)->tok_ident->value)) {
                 std::cerr << "[Error] Unknown identifier" << std::endl;
                 ::exit(EXIT_FAILURE);
             }
             ast_expr((*stmt_eq)->expr);
             pop("rax");
-            m_file << "    mov QWORD [rsp + 8*" << m_stack_loc - m_vars.at((*stmt_eq)->tok_ident->value) << "], rax\n";
+            m_file << "    mov QWORD [rsp + 8*"
+                   << m_stack_loc - m_vars_lookup.at((*stmt_eq)->tok_ident->value)->stack_offset << "], rax\n";
             if ((*stmt_eq)->next_stmt.has_value()) {
                 ast_stmt((*stmt_eq)->next_stmt.value());
             }
@@ -330,6 +335,12 @@ public:
                 ast_stmt((*stmt_if)->next_stmt.value());
             }
         }
+        else if (auto stmt_scope = std::get_if<ast::NodeStmtScope*>(&stmt->var)) {
+            ast_scope((*stmt_scope)->scope);
+            if ((*stmt_scope)->next_stmt.has_value()) {
+                ast_stmt((*stmt_scope)->next_stmt.value());
+            }
+        }
         else {
             // Unreachable
             assert(false);
@@ -353,9 +364,40 @@ public:
         return ".L" + std::to_string(m_label_count++);
     }
 
+    void begin_scope()
+    {
+        m_scopes.push(m_vars.size());
+    }
+
+    void end_scope()
+    {
+        int var_pop_count = 0;
+        while (m_vars.size() > m_scopes.top()) {
+            m_vars_lookup.erase(m_vars.back().name);
+            m_vars.pop_back();
+            var_pop_count++;
+        }
+        m_file << "    add rsp, " << 8 * var_pop_count << "\n";
+        m_stack_loc -= var_pop_count;
+    }
+
+    void push_var(const std::string& name)
+    {
+        assert(!m_vars_lookup.contains(name));
+        m_vars.push_back({ .name = name, .stack_offset = m_stack_loc });
+        m_vars_lookup.insert({ name, &m_vars.back() });
+    }
+
 private:
+    struct Var {
+        std::string name;
+        int stack_offset;
+    };
+
     std::fstream& m_file;
     int m_stack_loc;
-    std::unordered_map<std::string, int> m_vars {};
+    std::vector<Var> m_vars {};
+    std::unordered_map<std::string, Var*> m_vars_lookup {};
+    std::stack<size_t> m_scopes;
     int m_label_count;
 };

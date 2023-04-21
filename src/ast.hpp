@@ -94,8 +94,13 @@ struct NodeStmtIf {
     std::optional<NodeStmt*> next_stmt;
 };
 
+struct NodeStmtScope {
+    NodeScope* scope;
+    std::optional<NodeStmt*> next_stmt;
+};
+
 struct NodeStmt {
-    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*, NodeStmtIf*> var;
+    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*, NodeStmtIf*, NodeStmtScope*> var;
 };
 
 // TODO

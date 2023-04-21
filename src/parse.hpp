@@ -281,6 +281,13 @@ public:
             stmt->var = stmt_if;
             return stmt;
         }
+        else if (auto scope = parse_scope()) {
+            auto* stmt_scope = m_alloc.alloc<ast::NodeStmtScope>();
+            stmt_scope->scope = scope.value();
+            stmt_scope->next_stmt = parse_stmt();
+            stmt->var = stmt_scope;
+            return stmt;
+        }
         return {};
     }
 
