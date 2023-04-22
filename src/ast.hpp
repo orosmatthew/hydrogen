@@ -22,8 +22,12 @@ struct NodeTermBaseIdent {
     const Token* tok_ident;
 };
 
+struct NodeTermBaseStr {
+    const Token* tok_str_lit;
+};
+
 struct NodeTermBase {
-    std::variant<NodeTermBaseParen*, NodeTermBaseNum*, NodeTermBaseIdent*> var;
+    std::variant<NodeTermBaseParen*, NodeTermBaseNum*, NodeTermBaseIdent*, NodeTermBaseStr*> var;
 };
 
 struct NodeTermNeg {
@@ -47,23 +51,11 @@ struct NodeExpr {
 
 struct NodeStmt;
 
-struct NodeEqExpr {
-    NodeExpr* expr;
-};
-
-struct NodeEqStr {
-    const Token* tok_str;
-};
-
-struct NodeEq {
-    std::variant<NodeEqExpr*, NodeEqStr*> var;
-};
-
 struct NodeStmtLet {
     const Token* tok_let;
     const Token* tok_ident;
     const Token* tok_eq;
-    NodeEq* equation;
+    NodeExpr* expr;
     const Token* tok_semi;
     std::optional<NodeStmt*> next_stmt;
 };
@@ -71,7 +63,7 @@ struct NodeStmtLet {
 struct NodeStmtEq {
     const Token* tok_ident;
     const Token* tok_eq;
-    NodeEq* equation;
+    NodeExpr* expr;
     const Token* tok_semi;
     std::optional<NodeStmt*> next_stmt;
 };

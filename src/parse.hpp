@@ -71,6 +71,12 @@ public:
             term_base->var = term_base_ident;
             return term_base;
         }
+        else if (peak().value()->type == TokenType::str_lit) {
+            auto* term_base_str = m_alloc.alloc<ast::NodeTermBaseStr>();
+            term_base_str->tok_str_lit = consume();
+            term_base->var = term_base_str;
+            return term_base;
+        }
         return {};
     }
 
@@ -178,25 +184,6 @@ public:
         return {};
     }
 
-    std::optional<ast::NodeEq*> parse_equation()
-    {
-        if (peak().has_value() && peak().value()->type == TokenType::str_lit) {
-            auto eq_str = m_alloc.alloc<ast::NodeEqStr>();
-            eq_str->tok_str = consume();
-            auto eq = m_alloc.alloc<ast::NodeEq>();
-            eq->var = eq_str;
-            return eq;
-        }
-        else if (auto expr = parse_expr()) {
-            auto eq_expr = m_alloc.alloc<ast::NodeEqExpr>();
-            eq_expr->expr = expr.value();
-            auto eq = m_alloc.alloc<ast::NodeEq>();
-            eq->var = eq_expr;
-            return eq;
-        }
-        return {};
-    }
-
     std::optional<ast::NodeStmt*> parse_stmt()
     {
         auto* stmt = m_alloc.alloc<ast::NodeStmt>();
@@ -204,11 +191,11 @@ public:
             auto* stmt_eq = m_alloc.alloc<ast::NodeStmtEq>();
             stmt_eq->tok_ident = consume();
             stmt_eq->tok_eq = consume();
-            if (auto eq = parse_equation()) {
-                stmt_eq->equation = eq.value();
+            if (auto expr = parse_expr()) {
+                stmt_eq->expr = expr.value();
             }
             else {
-                error("Expected equation");
+                error("Expected expression");
             }
             if (peak().has_value() && peak().value()->type == TokenType::semi) {
                 stmt_eq->tok_semi = consume();
@@ -255,11 +242,11 @@ public:
             stmt_let->tok_let = consume();
             stmt_let->tok_ident = consume();
             stmt_let->tok_eq = consume();
-            if (auto eq = parse_equation()) {
-                stmt_let->equation = eq.value();
+            if (auto expr = parse_expr()) {
+                stmt_let->expr = expr.value();
             }
             else {
-                error("Expected equation");
+                error("Expected expression");
             }
             if (peak().has_value() && peak().value()->type == TokenType::semi) {
                 stmt_let->tok_semi = consume();

@@ -237,6 +237,20 @@ public:
                 << "]";
             push(str.str());
         }
+        else if (auto term_base_str = std::get_if<ast::NodeTermBaseStr*>(&term_base->var)) {
+            int data_num = m_data_count++;
+            m_data_stream << "    D" << data_num << ": db \"";
+            for (auto c : (*term_base_str)->tok_str_lit->value) {
+                if (c == '\n') {
+                    m_data_stream << "\", 0Ah, \"";
+                }
+                else {
+                    m_data_stream << c;
+                }
+            }
+            m_data_stream << "\"\n";
+            push("D" + std::to_string(data_num));
+        }
         else {
             // Unreachable
             assert(false);
@@ -283,30 +297,30 @@ public:
         end_scope();
     }
 
-    void ast_equation(const ast::NodeEq* eq)
-    {
-        if (auto eq_expr = std::get_if<ast::NodeEqExpr*>(&eq->var)) {
-            ast_expr((*eq_expr)->expr);
-        }
-        else if (auto eq_str = std::get_if<ast::NodeEqStr*>(&eq->var)) {
-            int data_num = m_data_count++;
-            m_data_stream << "    D" << data_num << ": db \"";
-            for (auto c : (*eq_str)->tok_str->value) {
-                if (c == '\n') {
-                    m_data_stream << "\", 0Ah, \"";
-                }
-                else {
-                    m_data_stream << c;
-                }
-            }
-            m_data_stream << "\"\n";
-            push("D" + std::to_string(data_num));
-        }
-        else {
-            // Unreachable
-            assert(false);
-        }
-    }
+    //    void ast_e2quation(const ast::NodeEq* eq)
+    //    {
+    //        if (auto eq_expr = std::get_if<ast::NodeEqExpr*>(&eq->var)) {
+    //            ast_expr((*eq_expr)->expr);
+    //        }
+    //        else if (auto eq_str = std::get_if<ast::NodeEqStr*>(&eq->var)) {
+    //            int data_num = m_data_count++;
+    //            m_data_stream << "    D" << data_num << ": db \"";
+    //            for (auto c : (*eq_str)->tok_str->value) {
+    //                if (c == '\n') {
+    //                    m_data_stream << "\", 0Ah, \"";
+    //                }
+    //                else {
+    //                    m_data_stream << c;
+    //                }
+    //            }
+    //            m_data_stream << "\"\n";
+    //            push("D" + std::to_string(data_num));
+    //        }
+    //        else {
+    //            // Unreachable
+    //            assert(false);
+    //        }
+    //    }
 
     void ast_stmt(const ast::NodeStmt* stmt)
     {
@@ -322,7 +336,7 @@ public:
         }
         else if (auto stmt_let = std::get_if<ast::NodeStmtLet*>(&stmt->var)) {
             if (!m_vars_lookup.contains((*stmt_let)->tok_ident->value)) {
-                ast_equation((*stmt_let)->equation);
+                ast_expr((*stmt_let)->expr);
                 push_var((*stmt_let)->tok_ident->value);
             }
             else {
@@ -338,7 +352,7 @@ public:
                 std::cerr << "[Error] Unknown identifier" << std::endl;
                 ::exit(EXIT_FAILURE);
             }
-            ast_equation((*stmt_eq)->equation);
+            ast_expr((*stmt_eq)->expr);
             pop("rax");
             m_file << "    mov QWORD [rsp + 8*"
                    << m_stack_loc - m_vars_lookup.at((*stmt_eq)->tok_ident->value)->stack_offset << "], rax\n";
