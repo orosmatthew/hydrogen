@@ -27,7 +27,9 @@ enum class TokenType {
     neq,
     str_lit,
     comma,
-    write
+    write,
+    true_,
+    false_
 };
 
 enum class BinAssoc { none, left, right };
@@ -167,6 +169,12 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             }
             else if (buf == "write") {
                 tokens.push_back({ TokenType::write, buf });
+            }
+            else if (buf == "true") {
+                tokens.push_back({ TokenType::true_, buf });
+            }
+            else if (buf == "false") {
+                tokens.push_back({ TokenType::false_, buf });
             }
             else {
                 tokens.push_back({ TokenType::ident, buf });

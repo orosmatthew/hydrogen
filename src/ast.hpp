@@ -26,8 +26,23 @@ struct NodeTermBaseStr {
     const Token* tok_str_lit;
 };
 
+struct NodeTermBaseTrue {
+    const Token* tok_true;
+};
+
+struct NodeTermBaseFalse {
+    const Token* tok_false;
+};
+
 struct NodeTermBase {
-    std::variant<NodeTermBaseParen*, NodeTermBaseNum*, NodeTermBaseIdent*, NodeTermBaseStr*> var;
+    std::variant<
+        NodeTermBaseParen*,
+        NodeTermBaseNum*,
+        NodeTermBaseIdent*,
+        NodeTermBaseStr*,
+        NodeTermBaseTrue*,
+        NodeTermBaseFalse*>
+        var;
 };
 
 struct NodeTermNeg {

@@ -77,6 +77,18 @@ public:
             term_base->var = term_base_str;
             return term_base;
         }
+        else if (peak().value()->type == TokenType::true_) {
+            auto* term_base_true = m_alloc.alloc<ast::NodeTermBaseTrue>();
+            term_base_true->tok_true = consume();
+            term_base->var = term_base_true;
+            return term_base;
+        }
+        else if (peak().value()->type == TokenType::false_) {
+            auto* term_base_false = m_alloc.alloc<ast::NodeTermBaseFalse>();
+            term_base_false->tok_false = consume();
+            term_base->var = term_base_false;
+            return term_base;
+        }
         return {};
     }
 

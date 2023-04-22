@@ -8,7 +8,7 @@
 
 class Generator {
 public:
-    enum class PrimitiveType { i32, u64, i64 };
+    enum class PrimitiveType { i32, u64, i64, bool_ };
 
     explicit Generator(std::fstream& file)
         : m_file(file)
@@ -261,9 +261,18 @@ public:
             push("D" + std::to_string(data_num));
             return PrimitiveType::u64;
         }
+        else if (auto term_base_true = std::get_if<ast::NodeTermBaseTrue*>(&term_base->var)) {
+            push("1");
+            return PrimitiveType::bool_;
+        }
+        else if (auto term_base_false = std::get_if<ast::NodeTermBaseFalse*>(&term_base->var)) {
+            push("0");
+            return PrimitiveType::bool_;
+        }
         else {
             // Unreachable
             assert(false);
+            ::exit(EXIT_FAILURE);
         }
     }
 
@@ -282,6 +291,7 @@ public:
         else {
             // Unreachable
             assert(false);
+            ::exit(EXIT_FAILURE);
         }
     }
 
@@ -296,6 +306,7 @@ public:
         else {
             // Unreachable
             assert(false);
+            ::exit(EXIT_FAILURE);
         }
     }
 
@@ -351,7 +362,7 @@ public:
                 push_var((*stmt_let)->tok_ident->value, type);
             }
             else {
-                std::cerr << "[Error] Identifier already defined" << std::endl;
+                std::cerr << "[Error] Identifier already defined: " << (*stmt_let)->tok_ident->value << std::endl;
                 ::exit(EXIT_FAILURE);
             }
             if ((*stmt_let)->next_stmt.has_value()) {
@@ -450,6 +461,7 @@ public:
             m_vars.pop_back();
             var_pop_count++;
         }
+        m_scopes.pop();
         m_file << "    add rsp, " << 8 * var_pop_count << "\n";
         m_stack_loc -= var_pop_count;
     }
@@ -472,7 +484,7 @@ private:
     int m_stack_loc;
     std::vector<Var> m_vars {};
     std::unordered_map<std::string, Var*> m_vars_lookup {};
-    std::stack<size_t> m_scopes;
+    std::stack<size_t> m_scopes {};
     int m_label_count;
     int m_data_count;
     std::stringstream m_data_stream;
