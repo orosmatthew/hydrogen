@@ -234,6 +234,18 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             i++;
             std::string buf;
             while (source[i] != '"') {
+                if (source[i] == '\\') {
+                    switch (source[i + 1]) {
+                    case 'n':
+                        buf.push_back('\n');
+                        i += 2;
+                        break;
+                    default:
+                        std::cerr << "[Error] Unknown escape" << std::endl;
+                        exit(EXIT_FAILURE);
+                    }
+                    continue;
+                }
                 buf.push_back(source[i]);
                 i++;
             }

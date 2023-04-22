@@ -290,7 +290,16 @@ public:
         }
         else if (auto eq_str = std::get_if<ast::NodeEqStr*>(&eq->var)) {
             int data_num = m_data_count++;
-            m_data_stream << "    D" << data_num << ": db \"" << (*eq_str)->tok_str->value << "\", 0x00\n";
+            m_data_stream << "    D" << data_num << ": db \"";
+            for (auto c : (*eq_str)->tok_str->value) {
+                if (c == '\n') {
+                    m_data_stream << "\", 0Ah, \"";
+                }
+                else {
+                    m_data_stream << c;
+                }
+            }
+            m_data_stream << "\"\n";
             push("D" + std::to_string(data_num));
         }
         else {
