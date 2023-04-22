@@ -12,7 +12,9 @@ public:
         : m_file(file)
         , m_stack_loc(0)
         , m_label_count(0)
+        , m_data_count(0)
     {
+        m_data_stream << "section .data\n";
     }
 
     void print_u64_def()
@@ -127,6 +129,11 @@ public:
         m_file << "    mov rax, 0x3c\n";
         m_file << "    mov rdi, 0\n";
         m_file << "    syscall\n";
+    }
+
+    void append_data()
+    {
+        m_file << m_data_stream.str();
     }
 
     void ast_expr_bin(const ast::NodeExprBin* expr_bin)
@@ -276,6 +283,22 @@ public:
         end_scope();
     }
 
+    void ast_equation(const ast::NodeEq* eq)
+    {
+        if (auto eq_expr = std::get_if<ast::NodeEqExpr*>(&eq->var)) {
+            ast_expr((*eq_expr)->expr);
+        }
+        else if (auto eq_str = std::get_if<ast::NodeEqStr*>(&eq->var)) {
+            int data_num = m_data_count++;
+            m_data_stream << "    D" << data_num << ": db \"" << (*eq_str)->tok_str->value << "\", 0x00\n";
+            push("D" + std::to_string(data_num));
+        }
+        else {
+            // Unreachable
+            assert(false);
+        }
+    }
+
     void ast_stmt(const ast::NodeStmt* stmt)
     {
         m_file << "    ;; -- stmt --\n";
@@ -290,7 +313,7 @@ public:
         }
         else if (auto stmt_let = std::get_if<ast::NodeStmtLet*>(&stmt->var)) {
             if (!m_vars_lookup.contains((*stmt_let)->tok_ident->value)) {
-                ast_expr((*stmt_let)->expr);
+                ast_equation((*stmt_let)->equation);
                 push_var((*stmt_let)->tok_ident->value);
             }
             else {
@@ -306,7 +329,7 @@ public:
                 std::cerr << "[Error] Unknown identifier" << std::endl;
                 ::exit(EXIT_FAILURE);
             }
-            ast_expr((*stmt_eq)->expr);
+            ast_equation((*stmt_eq)->equation);
             pop("rax");
             m_file << "    mov QWORD [rsp + 8*"
                    << m_stack_loc - m_vars_lookup.at((*stmt_eq)->tok_ident->value)->stack_offset << "], rax\n";
@@ -339,6 +362,18 @@ public:
             ast_scope((*stmt_scope)->scope);
             if ((*stmt_scope)->next_stmt.has_value()) {
                 ast_stmt((*stmt_scope)->next_stmt.value());
+            }
+        }
+        else if (auto stmt_write = std::get_if<ast::NodeStmtWrite*>(&stmt->var)) {
+            ast_expr((*stmt_write)->expr1);
+            ast_expr((*stmt_write)->expr2);
+            pop("rdx");
+            pop("rsi");
+            m_file << "    mov rax, 1\n";
+            m_file << "    mov rdi, 1\n";
+            m_file << "    syscall\n";
+            if ((*stmt_write)->next_stmt.has_value()) {
+                ast_stmt((*stmt_write)->next_stmt.value());
             }
         }
         else {
@@ -400,4 +435,6 @@ private:
     std::unordered_map<std::string, Var*> m_vars_lookup {};
     std::stack<size_t> m_scopes;
     int m_label_count;
+    int m_data_count;
+    std::stringstream m_data_stream;
 };

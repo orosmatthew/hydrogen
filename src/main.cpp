@@ -56,6 +56,7 @@ int main(int argc, const char* argv[])
             gen.ast_stmt(root);
             gen.exit();
         }
+        gen.append_data();
     }
 
     std::cout << "[Progress] Assembling" << std::endl;

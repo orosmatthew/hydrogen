@@ -47,11 +47,23 @@ struct NodeExpr {
 
 struct NodeStmt;
 
+struct NodeEqExpr {
+    NodeExpr* expr;
+};
+
+struct NodeEqStr {
+    const Token* tok_str;
+};
+
+struct NodeEq {
+    std::variant<NodeEqExpr*, NodeEqStr*> var;
+};
+
 struct NodeStmtLet {
     const Token* tok_let;
     const Token* tok_ident;
     const Token* tok_eq;
-    NodeExpr* expr;
+    NodeEq* equation;
     const Token* tok_semi;
     std::optional<NodeStmt*> next_stmt;
 };
@@ -59,7 +71,7 @@ struct NodeStmtLet {
 struct NodeStmtEq {
     const Token* tok_ident;
     const Token* tok_eq;
-    const NodeExpr* expr;
+    NodeEq* equation;
     const Token* tok_semi;
     std::optional<NodeStmt*> next_stmt;
 };
@@ -99,8 +111,19 @@ struct NodeStmtScope {
     std::optional<NodeStmt*> next_stmt;
 };
 
+struct NodeStmtWrite {
+    const Token* tok_write;
+    const Token* tok_left_paren;
+    NodeExpr* expr1;
+    const Token* tok_comma;
+    NodeExpr* expr2;
+    const Token* tok_right_paren;
+    const Token* tok_semi;
+    std::optional<NodeStmt*> next_stmt;
+};
+
 struct NodeStmt {
-    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*, NodeStmtIf*, NodeStmtScope*> var;
+    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*, NodeStmtIf*, NodeStmtScope*, NodeStmtWrite*> var;
 };
 
 // TODO

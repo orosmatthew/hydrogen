@@ -25,6 +25,9 @@ enum class TokenType {
     right_curly,
     deq,
     neq,
+    str_lit,
+    comma,
+    write
 };
 
 enum class BinAssoc { none, left, right };
@@ -162,6 +165,9 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             else if (buf == "else") {
                 tokens.push_back({ TokenType::else_, buf });
             }
+            else if (buf == "write") {
+                tokens.push_back({ TokenType::write, buf });
+            }
             else {
                 tokens.push_back({ TokenType::ident, buf });
             }
@@ -222,6 +228,19 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
         }
         else if (source[i] == '!' && source[i + 1] == '=') {
             tokens.push_back({ TokenType::neq, "!=" });
+            i++;
+        }
+        else if (source[i] == '"') {
+            i++;
+            std::string buf;
+            while (source[i] != '"') {
+                buf.push_back(source[i]);
+                i++;
+            }
+            tokens.push_back({ TokenType::str_lit, buf });
+        }
+        else if (source[i] == ',') {
+            tokens.push_back({ TokenType::comma, "," });
             i++;
         }
         else if (source[i] != ' ' && source[i] != '\n' && source[i] != '\r' && source[i] != '\t') {
