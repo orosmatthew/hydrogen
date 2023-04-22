@@ -3,7 +3,7 @@
 #include <cctype>
 enum class TokenType {
     none,
-    i64,
+    int_lit,
     add,
     sub,
     multi,
@@ -94,7 +94,7 @@ std::string to_string(TokenType type)
     switch (type) {
     case TokenType::none:
         return "none";
-    case TokenType::i64:
+    case TokenType::int_lit:
         return "pos_i64";
     case TokenType::add:
         return "add";
@@ -144,7 +144,7 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
                 i++;
             } while (isdigit(source[i]));
             i--;
-            tokens.push_back({ TokenType::i64, num_buf });
+            tokens.push_back({ TokenType::int_lit, num_buf });
         }
         else if (isalpha(source[i]) || source[i] == '_') {
             std::string buf;

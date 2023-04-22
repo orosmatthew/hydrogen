@@ -59,7 +59,7 @@ public:
             term_base->var = term_base_paren;
             return term_base;
         }
-        else if (peak().value()->type == TokenType::i64) {
+        else if (peak().value()->type == TokenType::int_lit) {
             auto* term_base_num = m_alloc.alloc<ast::NodeTermBaseNum>();
             term_base_num->tok_num = consume();
             term_base->var = term_base_num;

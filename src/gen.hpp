@@ -8,6 +8,8 @@
 
 class Generator {
 public:
+    enum class PrimitiveType { i32, u64, i64 };
+
     explicit Generator(std::fstream& file)
         : m_file(file)
         , m_stack_loc(0)
@@ -136,10 +138,14 @@ public:
         m_file << m_data_stream.str();
     }
 
-    void ast_expr_bin(const ast::NodeExprBin* expr_bin)
+    PrimitiveType ast_expr_bin(const ast::NodeExprBin* expr_bin)
     {
-        ast_expr(expr_bin->lhs);
-        ast_expr(expr_bin->rhs);
+        PrimitiveType type1 = ast_expr(expr_bin->lhs);
+        PrimitiveType type2 = ast_expr(expr_bin->rhs);
+        if (type1 != type2) {
+            std::cerr << "[Error] Incompatible types" << std::endl;
+            ::exit(EXIT_FAILURE);
+        }
         if (expr_bin->tok_op->type == TokenType::multi) {
             pop("rax");
             pop("rbx");
@@ -217,15 +223,17 @@ public:
             // Unreachable
             assert(false);
         }
+        return type1;
     }
 
-    void ast_term_base(const ast::NodeTermBase* term_base)
+    PrimitiveType ast_term_base(const ast::NodeTermBase* term_base)
     {
         if (auto* node_paren = std::get_if<ast::NodeTermBaseParen*>(&term_base->var)) {
-            ast_expr((*node_paren)->expr);
+            return ast_expr((*node_paren)->expr);
         }
         else if (auto node_num = std::get_if<ast::NodeTermBaseNum*>(&term_base->var)) {
             push((*node_num)->tok_num->value);
+            return PrimitiveType::i64;
         }
         else if (auto node_ident = std::get_if<ast::NodeTermBaseIdent*>(&term_base->var)) {
             if (!m_vars_lookup.contains((*node_ident)->tok_ident->value)) {
@@ -236,6 +244,7 @@ public:
             str << "QWORD [rsp + 8*" << m_stack_loc - m_vars_lookup.at((*node_ident)->tok_ident->value)->stack_offset
                 << "]";
             push(str.str());
+            return m_vars_lookup.at((*node_ident)->tok_ident->value)->type;
         }
         else if (auto term_base_str = std::get_if<ast::NodeTermBaseStr*>(&term_base->var)) {
             int data_num = m_data_count++;
@@ -250,6 +259,7 @@ public:
             }
             m_data_stream << "\"\n";
             push("D" + std::to_string(data_num));
+            return PrimitiveType::u64;
         }
         else {
             // Unreachable
@@ -257,16 +267,17 @@ public:
         }
     }
 
-    void ast_term(const ast::NodeTerm* term)
+    PrimitiveType ast_term(const ast::NodeTerm* term)
     {
         if (auto node_neg = std::get_if<ast::NodeTermNeg*>(&term->var)) {
-            ast_term_base((*node_neg)->term_base);
+            PrimitiveType type = ast_term_base((*node_neg)->term_base);
             pop("rax");
             m_file << "    neg rax\n";
             push("rax");
+            return type;
         }
         else if (auto node_base = std::get_if<ast::NodeTermBase*>(&term->var)) {
-            ast_term_base((*node_base));
+            return ast_term_base((*node_base));
         }
         else {
             // Unreachable
@@ -274,13 +285,13 @@ public:
         }
     }
 
-    void ast_expr(const ast::NodeExpr* expr)
+    PrimitiveType ast_expr(const ast::NodeExpr* expr)
     {
         if (auto term = std::get_if<ast::NodeTerm*>(&expr->var)) {
-            ast_term((*term));
+            return ast_term((*term));
         }
         else if (auto expr_bin = std::get_if<ast::NodeExprBin*>(&expr->var)) {
-            ast_expr_bin((*expr_bin));
+            return ast_expr_bin((*expr_bin));
         }
         else {
             // Unreachable
@@ -336,8 +347,8 @@ public:
         }
         else if (auto stmt_let = std::get_if<ast::NodeStmtLet*>(&stmt->var)) {
             if (!m_vars_lookup.contains((*stmt_let)->tok_ident->value)) {
-                ast_expr((*stmt_let)->expr);
-                push_var((*stmt_let)->tok_ident->value);
+                PrimitiveType type = ast_expr((*stmt_let)->expr);
+                push_var((*stmt_let)->tok_ident->value, type);
             }
             else {
                 std::cerr << "[Error] Identifier already defined" << std::endl;
@@ -352,7 +363,11 @@ public:
                 std::cerr << "[Error] Unknown identifier" << std::endl;
                 ::exit(EXIT_FAILURE);
             }
-            ast_expr((*stmt_eq)->expr);
+            PrimitiveType type = ast_expr((*stmt_eq)->expr);
+            if (type != m_vars_lookup.at((*stmt_eq)->tok_ident->value)->type) {
+                std::cerr << "[Error] Invalid type" << std::endl;
+                ::exit(EXIT_FAILURE);
+            }
             pop("rax");
             m_file << "    mov QWORD [rsp + 8*"
                    << m_stack_loc - m_vars_lookup.at((*stmt_eq)->tok_ident->value)->stack_offset << "], rax\n";
@@ -439,10 +454,10 @@ public:
         m_stack_loc -= var_pop_count;
     }
 
-    void push_var(const std::string& name)
+    void push_var(const std::string& name, PrimitiveType type)
     {
         assert(!m_vars_lookup.contains(name));
-        m_vars.push_back({ .name = name, .stack_offset = m_stack_loc });
+        m_vars.push_back({ .name = name, .stack_offset = m_stack_loc, .type = type });
         m_vars_lookup.insert({ name, &m_vars.back() });
     }
 
@@ -450,6 +465,7 @@ private:
     struct Var {
         std::string name;
         int stack_offset;
+        PrimitiveType type;
     };
 
     std::fstream& m_file;
