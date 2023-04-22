@@ -8,7 +8,7 @@
 
 class Generator {
 public:
-    enum class PrimitiveType { i32, u64, i64, bool_ };
+    enum class PrimitiveType { unknown, i32, u64, i64, bool_ };
 
     explicit Generator(std::fstream& file)
         : m_file(file)
@@ -228,86 +228,108 @@ public:
 
     PrimitiveType ast_term_base(const ast::NodeTermBase* term_base)
     {
-        if (auto* node_paren = std::get_if<ast::NodeTermBaseParen*>(&term_base->var)) {
-            return ast_expr((*node_paren)->expr);
-        }
-        else if (auto node_num = std::get_if<ast::NodeTermBaseNum*>(&term_base->var)) {
-            push((*node_num)->tok_num->value);
-            return PrimitiveType::i64;
-        }
-        else if (auto node_ident = std::get_if<ast::NodeTermBaseIdent*>(&term_base->var)) {
-            if (!m_vars_lookup.contains((*node_ident)->tok_ident->value)) {
-                std::cerr << "[Error] Undefined identifier" << std::endl;
-                ::exit(EXIT_FAILURE);
+        struct TermBaseVisitor {
+            Generator* gen = nullptr;
+            PrimitiveType type = PrimitiveType::unknown;
+
+            void operator()(ast::NodeTermBaseParen* term_base_paren)
+            {
+                type = gen->ast_expr(term_base_paren->expr);
             }
-            std::stringstream str;
-            str << "QWORD [rsp + 8*" << m_stack_loc - m_vars_lookup.at((*node_ident)->tok_ident->value)->stack_offset
-                << "]";
-            push(str.str());
-            return m_vars_lookup.at((*node_ident)->tok_ident->value)->type;
-        }
-        else if (auto term_base_str = std::get_if<ast::NodeTermBaseStr*>(&term_base->var)) {
-            int data_num = m_data_count++;
-            m_data_stream << "    D" << data_num << ": db \"";
-            for (auto c : (*term_base_str)->tok_str_lit->value) {
-                if (c == '\n') {
-                    m_data_stream << "\", 0Ah, \"";
-                }
-                else {
-                    m_data_stream << c;
-                }
+            void operator()(ast::NodeTermBaseNum* term_base_num)
+            {
+                gen->push(term_base_num->tok_num->value);
+                type = PrimitiveType::i64;
             }
-            m_data_stream << "\"\n";
-            push("D" + std::to_string(data_num));
-            return PrimitiveType::u64;
-        }
-        else if (auto term_base_true = std::get_if<ast::NodeTermBaseTrue*>(&term_base->var)) {
-            push("1");
-            return PrimitiveType::bool_;
-        }
-        else if (auto term_base_false = std::get_if<ast::NodeTermBaseFalse*>(&term_base->var)) {
-            push("0");
-            return PrimitiveType::bool_;
-        }
-        else {
-            // Unreachable
-            assert(false);
-            ::exit(EXIT_FAILURE);
-        }
+            void operator()(ast::NodeTermBaseIdent* term_base_ident)
+            {
+                if (!gen->m_vars_lookup.contains(term_base_ident->tok_ident->value)) {
+                    std::cerr << "[Error] Undefined identifier" << std::endl;
+                    ::exit(EXIT_FAILURE);
+                }
+                std::stringstream str;
+                str << "QWORD [rsp + 8*"
+                    << gen->m_stack_loc - gen->m_vars_lookup.at(term_base_ident->tok_ident->value)->stack_offset << "]";
+                gen->push(str.str());
+                type = gen->m_vars_lookup.at(term_base_ident->tok_ident->value)->type;
+            }
+            void operator()(ast::NodeTermBaseStr* term_base_str)
+            {
+                int data_num = gen->m_data_count++;
+                gen->m_data_stream << "    D" << data_num << ": db \"";
+                for (auto c : term_base_str->tok_str_lit->value) {
+                    if (c == '\n') {
+                        gen->m_data_stream << "\", 0Ah, \"";
+                    }
+                    else {
+                        gen->m_data_stream << c;
+                    }
+                }
+                gen->m_data_stream << "\"\n";
+                gen->push("D" + std::to_string(data_num));
+                type = PrimitiveType::u64;
+            }
+            void operator()(ast::NodeTermBaseTrue*)
+            {
+                gen->push("1");
+                type = PrimitiveType::bool_;
+            }
+            void operator()(ast::NodeTermBaseFalse*)
+            {
+                gen->push("0");
+                type = PrimitiveType::bool_;
+            }
+        };
+
+        TermBaseVisitor visitor { this };
+        std::visit(visitor, term_base->var);
+        assert(visitor.type != PrimitiveType::unknown);
+        return visitor.type;
     }
 
     PrimitiveType ast_term(const ast::NodeTerm* term)
     {
-        if (auto node_neg = std::get_if<ast::NodeTermNeg*>(&term->var)) {
-            PrimitiveType type = ast_term_base((*node_neg)->term_base);
-            pop("rax");
-            m_file << "    neg rax\n";
-            push("rax");
-            return type;
-        }
-        else if (auto node_base = std::get_if<ast::NodeTermBase*>(&term->var)) {
-            return ast_term_base((*node_base));
-        }
-        else {
-            // Unreachable
-            assert(false);
-            ::exit(EXIT_FAILURE);
-        }
+        struct TermVisitor {
+            Generator* gen = nullptr;
+            PrimitiveType type = PrimitiveType::unknown;
+
+            void operator()(ast::NodeTermNeg* term_neg)
+            {
+                type = gen->ast_term_base(term_neg->term_base);
+                gen->pop("rax");
+                gen->m_file << "    neg rax\n";
+                gen->push("rax");
+            }
+            void operator()(ast::NodeTermBase* term_base)
+            {
+                type = gen->ast_term_base(term_base);
+            }
+        };
+        TermVisitor visitor { this };
+        std::visit(visitor, term->var);
+        assert(visitor.type != PrimitiveType::unknown);
+        return visitor.type;
     }
 
     PrimitiveType ast_expr(const ast::NodeExpr* expr)
     {
-        if (auto term = std::get_if<ast::NodeTerm*>(&expr->var)) {
-            return ast_term((*term));
-        }
-        else if (auto expr_bin = std::get_if<ast::NodeExprBin*>(&expr->var)) {
-            return ast_expr_bin((*expr_bin));
-        }
-        else {
-            // Unreachable
-            assert(false);
-            ::exit(EXIT_FAILURE);
-        }
+        struct ExprVisitor {
+            Generator* gen = nullptr;
+            PrimitiveType type = PrimitiveType::unknown;
+
+            void operator()(ast::NodeTerm* term)
+            {
+                type = gen->ast_term(term);
+            }
+            void operator()(ast::NodeExprBin* expr_bin)
+            {
+                type = gen->ast_expr_bin(expr_bin);
+            }
+        };
+        ExprVisitor visitor { this };
+        std::visit(visitor, expr->var);
+        assert(visitor.type != PrimitiveType::unknown);
+        return visitor.type;
     }
 
     void ast_scope(const ast::NodeScope* scope)
@@ -319,116 +341,101 @@ public:
         end_scope();
     }
 
-    //    void ast_e2quation(const ast::NodeEq* eq)
-    //    {
-    //        if (auto eq_expr = std::get_if<ast::NodeEqExpr*>(&eq->var)) {
-    //            ast_expr((*eq_expr)->expr);
-    //        }
-    //        else if (auto eq_str = std::get_if<ast::NodeEqStr*>(&eq->var)) {
-    //            int data_num = m_data_count++;
-    //            m_data_stream << "    D" << data_num << ": db \"";
-    //            for (auto c : (*eq_str)->tok_str->value) {
-    //                if (c == '\n') {
-    //                    m_data_stream << "\", 0Ah, \"";
-    //                }
-    //                else {
-    //                    m_data_stream << c;
-    //                }
-    //            }
-    //            m_data_stream << "\"\n";
-    //            push("D" + std::to_string(data_num));
-    //        }
-    //        else {
-    //            // Unreachable
-    //            assert(false);
-    //        }
-    //    }
-
     void ast_stmt(const ast::NodeStmt* stmt)
     {
+        struct StmtVisitor {
+            Generator* gen = nullptr;
+
+            void operator()(ast::NodeStmtPrint* stmt_print) const
+            {
+                gen->ast_expr(stmt_print->expr);
+                gen->pop("rdi");
+                gen->print_i64();
+                gen->print_newline();
+                if (stmt_print->next_stmt.has_value()) {
+                    gen->ast_stmt(stmt_print->next_stmt.value());
+                }
+            }
+            void operator()(ast::NodeStmtLet* stmt_let) const
+            {
+                if (!gen->m_vars_lookup.contains(stmt_let->tok_ident->value)) {
+                    PrimitiveType type = gen->ast_expr(stmt_let->expr);
+                    gen->push_var(stmt_let->tok_ident->value, type);
+                }
+                else {
+                    std::cerr << "[Error] Identifier already defined: " << stmt_let->tok_ident->value << std::endl;
+                    ::exit(EXIT_FAILURE);
+                }
+                if (stmt_let->next_stmt.has_value()) {
+                    gen->ast_stmt(stmt_let->next_stmt.value());
+                }
+            }
+            void operator()(ast::NodeStmtEq* stmt_eq) const
+            {
+                if (!gen->m_vars_lookup.contains(stmt_eq->tok_ident->value)) {
+                    std::cerr << "[Error] Unknown identifier" << std::endl;
+                    ::exit(EXIT_FAILURE);
+                }
+                PrimitiveType type = gen->ast_expr(stmt_eq->expr);
+                if (type != gen->m_vars_lookup.at(stmt_eq->tok_ident->value)->type) {
+                    std::cerr << "[Error] Invalid type" << std::endl;
+                    ::exit(EXIT_FAILURE);
+                }
+                gen->pop("rax");
+                gen->m_file << "    mov QWORD [rsp + 8*"
+                            << gen->m_stack_loc - gen->m_vars_lookup.at(stmt_eq->tok_ident->value)->stack_offset
+                            << "], rax\n";
+                if (stmt_eq->next_stmt.has_value()) {
+                    gen->ast_stmt(stmt_eq->next_stmt.value());
+                }
+            }
+            void operator()(ast::NodeStmtIf* stmt_if) const
+            {
+                gen->ast_expr(stmt_if->expr);
+                const std::string else_label = gen->get_next_label();
+                gen->pop("rax");
+                gen->m_file << "    test rax, rax\n";
+                gen->m_file << "    jz " << else_label << "\n";
+                gen->ast_scope(stmt_if->scope);
+                if (stmt_if->else_.has_value()) {
+                    const std::string end_label = gen->get_next_label();
+                    gen->m_file << "    jmp " << end_label << "\n";
+                    gen->m_file << else_label << ":\n";
+                    gen->ast_scope(stmt_if->else_.value()->scope);
+                    gen->m_file << end_label << ":\n";
+                }
+                else {
+                    gen->m_file << else_label << ":\n";
+                }
+                if (stmt_if->next_stmt.has_value()) {
+                    gen->ast_stmt(stmt_if->next_stmt.value());
+                }
+            }
+            void operator()(ast::NodeStmtScope* stmt_scope) const
+            {
+                gen->ast_scope(stmt_scope->scope);
+                if (stmt_scope->next_stmt.has_value()) {
+                    gen->ast_stmt(stmt_scope->next_stmt.value());
+                }
+            }
+            void operator()(ast::NodeStmtWrite* stmt_write) const
+            {
+                gen->ast_expr(stmt_write->expr1);
+                gen->ast_expr(stmt_write->expr2);
+                gen->pop("rdx");
+                gen->pop("rsi");
+                gen->m_file << "    mov rax, 1\n";
+                gen->m_file << "    mov rdi, 1\n";
+                gen->m_file << "    syscall\n";
+                if (stmt_write->next_stmt.has_value()) {
+                    gen->ast_stmt(stmt_write->next_stmt.value());
+                }
+            }
+        };
+
         m_file << "    ;; -- stmt --\n";
-        if (auto stmt_print = std::get_if<ast::NodeStmtPrint*>(&stmt->var)) {
-            ast_expr((*stmt_print)->expr);
-            pop("rdi");
-            print_i64();
-            print_newline();
-            if ((*stmt_print)->next_stmt.has_value()) {
-                ast_stmt((*stmt_print)->next_stmt.value());
-            }
-        }
-        else if (auto stmt_let = std::get_if<ast::NodeStmtLet*>(&stmt->var)) {
-            if (!m_vars_lookup.contains((*stmt_let)->tok_ident->value)) {
-                PrimitiveType type = ast_expr((*stmt_let)->expr);
-                push_var((*stmt_let)->tok_ident->value, type);
-            }
-            else {
-                std::cerr << "[Error] Identifier already defined: " << (*stmt_let)->tok_ident->value << std::endl;
-                ::exit(EXIT_FAILURE);
-            }
-            if ((*stmt_let)->next_stmt.has_value()) {
-                ast_stmt((*stmt_let)->next_stmt.value());
-            }
-        }
-        else if (auto stmt_eq = std::get_if<ast::NodeStmtEq*>(&stmt->var)) {
-            if (!m_vars_lookup.contains((*stmt_eq)->tok_ident->value)) {
-                std::cerr << "[Error] Unknown identifier" << std::endl;
-                ::exit(EXIT_FAILURE);
-            }
-            PrimitiveType type = ast_expr((*stmt_eq)->expr);
-            if (type != m_vars_lookup.at((*stmt_eq)->tok_ident->value)->type) {
-                std::cerr << "[Error] Invalid type" << std::endl;
-                ::exit(EXIT_FAILURE);
-            }
-            pop("rax");
-            m_file << "    mov QWORD [rsp + 8*"
-                   << m_stack_loc - m_vars_lookup.at((*stmt_eq)->tok_ident->value)->stack_offset << "], rax\n";
-            if ((*stmt_eq)->next_stmt.has_value()) {
-                ast_stmt((*stmt_eq)->next_stmt.value());
-            }
-        }
-        else if (auto stmt_if = std::get_if<ast::NodeStmtIf*>(&stmt->var)) {
-            ast_expr((*stmt_if)->expr);
-            const std::string else_label = get_next_label();
-            pop("rax");
-            m_file << "    test rax, rax\n";
-            m_file << "    jz " << else_label << "\n";
-            ast_scope((*stmt_if)->scope);
-            if ((*stmt_if)->else_.has_value()) {
-                const std::string end_label = get_next_label();
-                m_file << "    jmp " << end_label << "\n";
-                m_file << else_label << ":\n";
-                ast_scope((*stmt_if)->else_.value()->scope);
-                m_file << end_label << ":\n";
-            }
-            else {
-                m_file << else_label << ":\n";
-            }
-            if ((*stmt_if)->next_stmt.has_value()) {
-                ast_stmt((*stmt_if)->next_stmt.value());
-            }
-        }
-        else if (auto stmt_scope = std::get_if<ast::NodeStmtScope*>(&stmt->var)) {
-            ast_scope((*stmt_scope)->scope);
-            if ((*stmt_scope)->next_stmt.has_value()) {
-                ast_stmt((*stmt_scope)->next_stmt.value());
-            }
-        }
-        else if (auto stmt_write = std::get_if<ast::NodeStmtWrite*>(&stmt->var)) {
-            ast_expr((*stmt_write)->expr1);
-            ast_expr((*stmt_write)->expr2);
-            pop("rdx");
-            pop("rsi");
-            m_file << "    mov rax, 1\n";
-            m_file << "    mov rdi, 1\n";
-            m_file << "    syscall\n";
-            if ((*stmt_write)->next_stmt.has_value()) {
-                ast_stmt((*stmt_write)->next_stmt.value());
-            }
-        }
-        else {
-            // Unreachable
-            assert(false);
-        }
+        StmtVisitor visitor { this };
+        std::visit(visitor, stmt->var);
     }
 
     void push(const std::string& str)
