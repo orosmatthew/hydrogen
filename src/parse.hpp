@@ -346,6 +346,34 @@ public:
             stmt->var = stmt_scope;
             return stmt;
         }
+        else if (
+            peak(2).has_value() && peak().value()->type == TokenType::while_
+            && peak(2).value()->type == TokenType::left_paren) {
+            auto* stmt_while = m_alloc.alloc<ast::NodeStmtWhile>();
+            stmt_while->tok_while = consume();
+            stmt_while->tok_left_paren = consume();
+            if (auto expr = parse_expr()) {
+                stmt_while->expr = expr.value();
+            }
+            else {
+                error("Expected expression");
+            }
+            if (peak().has_value() && peak().value()->type == TokenType::right_paren) {
+                stmt_while->tok_right_paren = consume();
+            }
+            else {
+                error("Expected `)`");
+            }
+            if (auto node_scope = parse_scope()) {
+                stmt_while->scope = node_scope.value();
+            }
+            else {
+                error("Expected scope");
+            }
+            stmt_while->next_stmt = parse_stmt();
+            stmt->var = stmt_while;
+            return stmt;
+        }
         return {};
     }
 

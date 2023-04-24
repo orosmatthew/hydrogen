@@ -129,8 +129,18 @@ struct NodeStmtWrite {
     std::optional<NodeStmt*> next_stmt;
 };
 
+struct NodeStmtWhile {
+    const Token* tok_while;
+    const Token* tok_left_paren;
+    NodeExpr* expr;
+    const Token* tok_right_paren;
+    NodeScope* scope;
+    std::optional<ast::NodeStmt*> next_stmt;
+};
+
 struct NodeStmt {
-    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*, NodeStmtIf*, NodeStmtScope*, NodeStmtWrite*> var;
+    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*, NodeStmtIf*, NodeStmtScope*, NodeStmtWrite*, NodeStmtWhile*>
+        var;
 };
 
 // TODO

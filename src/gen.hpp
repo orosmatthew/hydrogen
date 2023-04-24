@@ -431,6 +431,22 @@ public:
                     gen->ast_stmt(stmt_write->next_stmt.value());
                 }
             }
+            void operator()(ast::NodeStmtWhile* stmt_while) const
+            {
+                const std::string begin_label = gen->get_next_label();
+                const std::string end_label = gen->get_next_label();
+                gen->m_file << begin_label << ":\n";
+                gen->ast_expr(stmt_while->expr);
+                gen->pop("rax");
+                gen->m_file << "    test rax, rax\n";
+                gen->m_file << "    jz " << end_label << "\n";
+                gen->ast_scope(stmt_while->scope);
+                gen->m_file << "    jmp " << begin_label << "\n";
+                gen->m_file << end_label << ":\n";
+                if (stmt_while->next_stmt.has_value()) {
+                    gen->ast_stmt(stmt_while->next_stmt.value());
+                }
+            }
         };
 
         m_file << "    ;; -- stmt --\n";
