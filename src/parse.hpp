@@ -374,6 +374,14 @@ public:
             stmt->var = stmt_while;
             return stmt;
         }
+        else if (
+            peak(2).has_value() && peak().value()->type == TokenType::break_
+            && peak(2).value()->type == TokenType::semi) {
+            auto stmt_break = m_alloc.alloc<ast::NodeStmtBreak>();
+            stmt_break->tok_break = consume();
+            stmt_break->tok_semi = consume();
+            stmt_break->next_stmt = parse_stmt();
+        }
         return {};
     }
 

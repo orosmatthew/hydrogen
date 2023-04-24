@@ -138,8 +138,22 @@ struct NodeStmtWhile {
     std::optional<ast::NodeStmt*> next_stmt;
 };
 
+struct NodeStmtBreak {
+    const Token* tok_break;
+    const Token* tok_semi;
+    std::optional<NodeStmt*> next_stmt;
+};
+
 struct NodeStmt {
-    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*, NodeStmtIf*, NodeStmtScope*, NodeStmtWrite*, NodeStmtWhile*>
+    std::variant<
+        NodeStmtPrint*,
+        NodeStmtLet*,
+        NodeStmtEq*,
+        NodeStmtIf*,
+        NodeStmtScope*,
+        NodeStmtWrite*,
+        NodeStmtWhile*,
+        NodeStmtBreak*>
         var;
 };
 

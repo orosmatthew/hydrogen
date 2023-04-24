@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <stack>
+#include <utility>
 
 #include "ast.hpp"
 #include "token.hpp"
@@ -332,9 +333,9 @@ public:
         return visitor.type;
     }
 
-    void ast_scope(const ast::NodeScope* scope)
+    void ast_scope(const ast::NodeScope* scope, std::optional<std::string> break_label = std::nullopt)
     {
-        begin_scope();
+        begin_scope(std::move(break_label));
         if (scope->stmt.has_value()) {
             ast_stmt(scope->stmt.value());
         }
@@ -440,12 +441,15 @@ public:
                 gen->pop("rax");
                 gen->m_file << "    test rax, rax\n";
                 gen->m_file << "    jz " << end_label << "\n";
-                gen->ast_scope(stmt_while->scope);
+                gen->ast_scope(stmt_while->scope, end_label);
                 gen->m_file << "    jmp " << begin_label << "\n";
                 gen->m_file << end_label << ":\n";
                 if (stmt_while->next_stmt.has_value()) {
                     gen->ast_stmt(stmt_while->next_stmt.value());
                 }
+            }
+            void operator()(ast::NodeStmtBreak* stmt_break)
+            {
             }
         };
 
@@ -471,15 +475,15 @@ public:
         return ".L" + std::to_string(m_label_count++);
     }
 
-    void begin_scope()
+    void begin_scope(std::optional<std::string> break_label = std::nullopt)
     {
-        m_scopes.push(m_vars.size());
+        m_scopes.push({ .var_index = m_vars.size(), .break_label = std::move(break_label) });
     }
 
     void end_scope()
     {
         int var_pop_count = 0;
-        while (m_vars.size() > m_scopes.top()) {
+        while (m_vars.size() > m_scopes.top().var_index) {
             m_vars_lookup.erase(m_vars.back().name);
             m_vars.pop_back();
             var_pop_count++;
@@ -503,11 +507,16 @@ private:
         PrimitiveType type;
     };
 
+    struct Scope {
+        size_t var_index;
+        std::optional<std::string> break_label;
+    };
+
     std::fstream& m_file;
     int m_stack_loc;
     std::vector<Var> m_vars {};
     std::unordered_map<std::string, Var*> m_vars_lookup {};
-    std::stack<size_t> m_scopes {};
+    std::stack<Scope> m_scopes {};
     int m_label_count;
     int m_data_count;
     std::stringstream m_data_stream;

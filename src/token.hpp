@@ -30,7 +30,8 @@ enum class TokenType {
     write,
     true_,
     false_,
-    while_
+    while_,
+    break_
 };
 
 enum class BinAssoc { none, left, right };
@@ -179,6 +180,9 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             }
             else if (buf == "while") {
                 tokens.push_back({ TokenType::while_, buf });
+            }
+            else if (buf == "break") {
+                tokens.push_back({ TokenType::break_, buf });
             }
             else {
                 tokens.push_back({ TokenType::ident, buf });
