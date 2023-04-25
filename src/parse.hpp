@@ -381,6 +381,8 @@ public:
             stmt_break->tok_break = consume();
             stmt_break->tok_semi = consume();
             stmt_break->next_stmt = parse_stmt();
+            stmt->var = stmt_break;
+            return stmt;
         }
         return {};
     }

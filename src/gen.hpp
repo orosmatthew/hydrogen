@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <ranges>
 #include <stack>
 #include <utility>
 
@@ -10,6 +11,7 @@
 class Generator {
 public:
     enum class PrimitiveType { unknown, i32, u64, i64, bool_ };
+    enum class ScopeType { generic, loop };
 
     explicit Generator(std::fstream& file)
         : m_file(file)
@@ -333,9 +335,9 @@ public:
         return visitor.type;
     }
 
-    void ast_scope(const ast::NodeScope* scope, std::optional<std::string> break_label = std::nullopt)
+    void ast_scope(const ast::NodeScope* scope, ScopeType type, std::optional<std::string> break_label = std::nullopt)
     {
-        begin_scope(std::move(break_label));
+        begin_scope(type, std::move(break_label));
         if (scope->stmt.has_value()) {
             ast_stmt(scope->stmt.value());
         }
@@ -397,12 +399,12 @@ public:
                 gen->pop("rax");
                 gen->m_file << "    test rax, rax\n";
                 gen->m_file << "    jz " << else_label << "\n";
-                gen->ast_scope(stmt_if->scope);
+                gen->ast_scope(stmt_if->scope, ScopeType::generic);
                 if (stmt_if->else_.has_value()) {
                     const std::string end_label = gen->get_next_label();
                     gen->m_file << "    jmp " << end_label << "\n";
                     gen->m_file << else_label << ":\n";
-                    gen->ast_scope(stmt_if->else_.value()->scope);
+                    gen->ast_scope(stmt_if->else_.value()->scope, ScopeType::generic);
                     gen->m_file << end_label << ":\n";
                 }
                 else {
@@ -414,7 +416,7 @@ public:
             }
             void operator()(ast::NodeStmtScope* stmt_scope) const
             {
-                gen->ast_scope(stmt_scope->scope);
+                gen->ast_scope(stmt_scope->scope, ScopeType::generic);
                 if (stmt_scope->next_stmt.has_value()) {
                     gen->ast_stmt(stmt_scope->next_stmt.value());
                 }
@@ -441,7 +443,7 @@ public:
                 gen->pop("rax");
                 gen->m_file << "    test rax, rax\n";
                 gen->m_file << "    jz " << end_label << "\n";
-                gen->ast_scope(stmt_while->scope, end_label);
+                gen->ast_scope(stmt_while->scope, ScopeType::loop, end_label);
                 gen->m_file << "    jmp " << begin_label << "\n";
                 gen->m_file << end_label << ":\n";
                 if (stmt_while->next_stmt.has_value()) {
@@ -450,6 +452,23 @@ public:
             }
             void operator()(ast::NodeStmtBreak* stmt_break)
             {
+                std::optional<std::string> break_label;
+                int scope_count = -1;
+                for (const auto& m_scope : std::ranges::reverse_view(gen->m_scopes)) {
+                    if (m_scope.type == ScopeType::loop && m_scope.break_label.has_value()) {
+                        break_label = m_scope.break_label.value();
+                        break;
+                    }
+                    scope_count++;
+                }
+                if (!break_label.has_value()) {
+                    std::cerr << "[Error] Attempt to break outside of loop" << std::endl;
+                    ::exit(EXIT_FAILURE);
+                }
+                for (int i = 0; i < scope_count; i++) {
+                    gen->end_scope();
+                }
+                gen->m_file << "    jmp " << break_label.value() << "\n";
             }
         };
 
@@ -475,21 +494,23 @@ public:
         return ".L" + std::to_string(m_label_count++);
     }
 
-    void begin_scope(std::optional<std::string> break_label = std::nullopt)
+    void begin_scope(ScopeType type, std::optional<std::string> break_label = std::nullopt)
     {
-        m_scopes.push({ .var_index = m_vars.size(), .break_label = std::move(break_label) });
+        m_scopes.push_back({ .type = type, .var_index = m_vars.size(), .break_label = std::move(break_label) });
     }
 
     void end_scope()
     {
         int var_pop_count = 0;
-        while (m_vars.size() > m_scopes.top().var_index) {
+        while (m_vars.size() > m_scopes.back().var_index) {
             m_vars_lookup.erase(m_vars.back().name);
             m_vars.pop_back();
             var_pop_count++;
         }
-        m_scopes.pop();
-        m_file << "    add rsp, " << 8 * var_pop_count << "\n";
+        m_scopes.pop_back();
+        if (var_pop_count != 0) {
+            m_file << "    add rsp, " << 8 * var_pop_count << "\n";
+        }
         m_stack_loc -= var_pop_count;
     }
 
@@ -508,6 +529,7 @@ private:
     };
 
     struct Scope {
+        ScopeType type;
         size_t var_index;
         std::optional<std::string> break_label;
     };
@@ -516,7 +538,7 @@ private:
     int m_stack_loc;
     std::vector<Var> m_vars {};
     std::unordered_map<std::string, Var*> m_vars_lookup {};
-    std::stack<Scope> m_scopes {};
+    std::vector<Scope> m_scopes {};
     int m_label_count;
     int m_data_count;
     std::stringstream m_data_stream;
