@@ -35,6 +35,16 @@ struct NodeTermBaseIdent {
     std::optional<NodePost*> post;
 };
 
+struct NodeTermBaseInc {
+    const Token* tok_inc;
+    const Token* tok_ident;
+};
+
+struct NodeTermBaseDec {
+    const Token* tok_dec;
+    const Token* tok_ident;
+};
+
 struct NodeTermBaseStr {
     const Token* tok_str_lit;
 };
@@ -54,7 +64,9 @@ struct NodeTermBase {
         NodeTermBaseIdent*,
         NodeTermBaseStr*,
         NodeTermBaseTrue*,
-        NodeTermBaseFalse*>
+        NodeTermBaseFalse*,
+        NodeTermBaseInc*,
+        NodeTermBaseDec*>
         var;
 };
 

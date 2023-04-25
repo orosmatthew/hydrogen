@@ -317,6 +317,42 @@ public:
                 gen->push("0");
                 type = PrimitiveType::bool_;
             }
+            void operator()(ast::NodeTermBaseInc* term_base_inc)
+            {
+                if (!gen->m_vars_lookup.contains(term_base_inc->tok_ident->value)) {
+                    std::cerr << "[Error] Undefined identifier" << std::endl;
+                    ::exit(EXIT_FAILURE);
+                }
+                const Var* var = gen->m_vars_lookup.at(term_base_inc->tok_ident->value);
+                if (var->type != PrimitiveType::i64) {
+                    std::cerr << "[Error] Cannot increment on type" << std::endl;
+                    ::exit(EXIT_FAILURE);
+                }
+                gen->m_file << "    mov rax, QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "]\n";
+                gen->m_file << "    mov rbx, 1\n";
+                gen->m_file << "    add rax, rbx\n";
+                gen->m_file << "    mov QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "], rax\n";
+                gen->push("rax");
+                type = PrimitiveType::i64;
+            }
+            void operator()(ast::NodeTermBaseDec* term_base_dec)
+            {
+                if (!gen->m_vars_lookup.contains(term_base_dec->tok_ident->value)) {
+                    std::cerr << "[Error] Undefined identifier" << std::endl;
+                    ::exit(EXIT_FAILURE);
+                }
+                const Var* var = gen->m_vars_lookup.at(term_base_dec->tok_ident->value);
+                if (var->type != PrimitiveType::i64) {
+                    std::cerr << "[Error] Cannot decrement on type" << std::endl;
+                    ::exit(EXIT_FAILURE);
+                }
+                gen->m_file << "    mov rax, QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "]\n";
+                gen->m_file << "    mov rbx, 1\n";
+                gen->m_file << "    sub rax, rbx\n";
+                gen->m_file << "    mov QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "], rax\n";
+                gen->push("rax");
+                type = PrimitiveType::i64;
+            }
         };
 
         TermBaseVisitor visitor { this };

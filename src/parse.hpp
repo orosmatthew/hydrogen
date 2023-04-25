@@ -111,7 +111,27 @@ public:
             term_base->var = term_base_false;
             return term_base;
         }
-        return {};
+        else if (
+            peak(2).has_value() && peak().value()->type == TokenType::inc
+            && peak(2).value()->type == TokenType::ident) {
+            auto* term_base_inc = m_alloc.alloc<ast::NodeTermBaseInc>();
+            term_base_inc->tok_inc = consume();
+            term_base_inc->tok_ident = consume();
+            term_base->var = term_base_inc;
+            return term_base;
+        }
+        else if (
+            peak(2).has_value() && peak().value()->type == TokenType::dec
+            && peak(2).value()->type == TokenType::ident) {
+            auto* term_base_dec = m_alloc.alloc<ast::NodeTermBaseDec>();
+            term_base_dec->tok_dec = consume();
+            term_base_dec->tok_ident = consume();
+            term_base->var = term_base_dec;
+            return term_base;
+        }
+        else {
+            return {};
+        }
     }
 
     std::optional<ast::NodeExpr*> parse_expr()
