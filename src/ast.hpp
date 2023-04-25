@@ -144,6 +144,12 @@ struct NodeStmtBreak {
     std::optional<NodeStmt*> next_stmt;
 };
 
+struct NodeStmtExpr {
+    NodeExpr* expr;
+    const Token* tok_semi;
+    std::optional<NodeStmt*> next_stmt;
+};
+
 struct NodeStmt {
     std::variant<
         NodeStmtPrint*,
@@ -153,7 +159,8 @@ struct NodeStmt {
         NodeStmtScope*,
         NodeStmtWrite*,
         NodeStmtWhile*,
-        NodeStmtBreak*>
+        NodeStmtBreak*,
+        NodeStmtExpr*>
         var;
 };
 

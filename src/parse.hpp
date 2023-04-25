@@ -384,6 +384,17 @@ public:
             stmt->var = stmt_break;
             return stmt;
         }
+        else if (auto expr = parse_expr()) {
+            auto stmt_expr = m_alloc.alloc<ast::NodeStmtExpr>();
+            stmt_expr->expr = expr.value();
+            if (!peak().has_value() || peak().value()->type != TokenType::semi) {
+                error("Expected `;`");
+            }
+            stmt_expr->tok_semi = consume();
+            stmt_expr->next_stmt = parse_stmt();
+            stmt->var = stmt_expr;
+            return stmt;
+        }
         return {};
     }
 

@@ -450,7 +450,7 @@ public:
                     gen->ast_stmt(stmt_while->next_stmt.value());
                 }
             }
-            void operator()(ast::NodeStmtBreak* stmt_break)
+            void operator()(ast::NodeStmtBreak* stmt_break) const
             {
                 std::optional<std::string> break_label;
                 int scope_count = -1;
@@ -469,6 +469,16 @@ public:
                     gen->end_scope();
                 }
                 gen->m_file << "    jmp " << break_label.value() << "\n";
+                if (stmt_break->next_stmt.has_value()) {
+                    gen->ast_stmt(stmt_break->next_stmt.value());
+                }
+            }
+            void operator()(ast::NodeStmtExpr* stmt_expr) const
+            {
+                gen->ast_expr(stmt_expr->expr);
+                if (stmt_expr->next_stmt.has_value()) {
+                    gen->ast_stmt(stmt_expr->next_stmt.value());
+                }
             }
         };
 
