@@ -21,6 +21,13 @@ public:
             post->var = post_inc;
             return post;
         }
+        else if (peak().has_value() && peak().value()->type == TokenType::dec) {
+            auto* post_dec = m_alloc.alloc<ast::NodePostDec>();
+            post_dec->tok_dec = consume();
+            auto* post = m_alloc.alloc<ast::NodePost>();
+            post->var = post_dec;
+            return post;
+        }
         else {
             return {};
         }

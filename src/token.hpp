@@ -33,6 +33,7 @@ enum class TokenType {
     while_,
     break_,
     inc,
+    dec,
 };
 
 enum class BinAssoc { none, left, right };
@@ -200,6 +201,11 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             }
         }
         else if (source[i] == '-') {
+            if (source[i + 1] == '-') {
+                tokens.push_back({ TokenType::dec, "--" });
+                i++;
+                continue;
+            }
             tokens.push_back({ TokenType::sub, "-" });
         }
         else if (source[i] == '*') {

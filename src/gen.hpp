@@ -256,14 +256,37 @@ public:
                 gen->push(str.str());
 
                 if (term_base_ident->post.has_value()) {
-                    if (var->type != PrimitiveType::i64) {
-                        std::cerr << "[Error] Increment not valid for type" << std::endl;
-                        ::exit(EXIT_FAILURE);
-                    }
-                    gen->m_file << "    mov rax, [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "]\n";
-                    gen->m_file << "    mov rbx, 1\n";
-                    gen->m_file << "    add rax, rbx\n";
-                    gen->m_file << "    mov QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "], rax\n";
+                    struct PostVisitor {
+                        Generator* gen;
+                        const Var* var;
+
+                        void operator()(ast::NodePostInc* post_inc) const
+                        {
+                            if (var->type != PrimitiveType::i64) {
+                                std::cerr << "[Error] Increment not valid for type" << std::endl;
+                                ::exit(EXIT_FAILURE);
+                            }
+                            gen->m_file << "    mov rax, [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "]\n";
+                            gen->m_file << "    mov rbx, 1\n";
+                            gen->m_file << "    add rax, rbx\n";
+                            gen->m_file << "    mov QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset
+                                        << "], rax\n";
+                        }
+                        void operator()(ast::NodePostDec* post_dec)
+                        {
+                            if (var->type != PrimitiveType::i64) {
+                                std::cerr << "[Error] Increment not valid for type" << std::endl;
+                                ::exit(EXIT_FAILURE);
+                            }
+                            gen->m_file << "    mov rax, [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "]\n";
+                            gen->m_file << "    mov rbx, 1\n";
+                            gen->m_file << "    sub rax, rbx\n";
+                            gen->m_file << "    mov QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset
+                                        << "], rax\n";
+                        }
+                    };
+                    PostVisitor visitor(gen, var);
+                    std::visit(visitor, term_base_ident->post.value()->var);
                 }
 
                 type = gen->m_vars_lookup.at(term_base_ident->tok_ident->value)->type;

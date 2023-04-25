@@ -10,8 +10,12 @@ struct NodePostInc {
     const Token* tok_inc;
 };
 
+struct NodePostDec {
+    const Token* tok_dec;
+};
+
 struct NodePost {
-    std::variant<NodePostInc*> var;
+    std::variant<NodePostInc*, NodePostDec*> var;
 };
 
 struct NodeExpr;
