@@ -31,7 +31,8 @@ enum class TokenType {
     true_,
     false_,
     while_,
-    break_
+    break_,
+    inc,
 };
 
 enum class BinAssoc { none, left, right };
@@ -189,7 +190,14 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
             }
         }
         else if (source[i] == '+') {
-            tokens.push_back({ TokenType::add, "+" });
+            if (source[i + 1] == '+') {
+                tokens.push_back({ TokenType::inc, "++" });
+                i++;
+                continue;
+            }
+            else {
+                tokens.push_back({ TokenType::add, "+" });
+            }
         }
         else if (source[i] == '-') {
             tokens.push_back({ TokenType::sub, "-" });
@@ -245,6 +253,7 @@ std::vector<Token> tokenize_file(const std::filesystem::path& path)
         else if (source[i] == '!' && source[i + 1] == '=') {
             tokens.push_back({ TokenType::neq, "!=" });
             i++;
+            continue;
         }
         else if (source[i] == '"') {
             i++;

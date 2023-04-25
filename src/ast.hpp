@@ -6,6 +6,14 @@
 
 namespace ast {
 
+struct NodePostInc {
+    const Token* tok_inc;
+};
+
+struct NodePost {
+    std::variant<NodePostInc*> var;
+};
+
 struct NodeExpr;
 
 struct NodeTermBaseParen {
@@ -20,6 +28,7 @@ struct NodeTermBaseNum {
 
 struct NodeTermBaseIdent {
     const Token* tok_ident;
+    std::optional<NodePost*> post;
 };
 
 struct NodeTermBaseStr {

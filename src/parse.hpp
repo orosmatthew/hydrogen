@@ -12,6 +12,20 @@ public:
     {
     }
 
+    std::optional<ast::NodePost*> parse_post()
+    {
+        if (peak().has_value() && peak().value()->type == TokenType::inc) {
+            auto* post_inc = m_alloc.alloc<ast::NodePostInc>();
+            post_inc->tok_inc = consume();
+            auto* post = m_alloc.alloc<ast::NodePost>();
+            post->var = post_inc;
+            return post;
+        }
+        else {
+            return {};
+        }
+    }
+
     std::optional<ast::NodeTerm*> parse_term()
     {
         if (peak().has_value() && peak().value()->type == TokenType::sub) {
@@ -68,6 +82,7 @@ public:
         else if (peak().value()->type == TokenType::ident) {
             auto* term_base_ident = m_alloc.alloc<ast::NodeTermBaseIdent>();
             term_base_ident->tok_ident = consume();
+            term_base_ident->post = parse_post();
             term_base->var = term_base_ident;
             return term_base;
         }
