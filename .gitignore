@@ -9,3 +9,6 @@ build
 # clangd
 .cache
 .clangd
+
+# tests
+tests/**/bin

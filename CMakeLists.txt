@@ -11,7 +11,9 @@ add_executable(hydro)
 
 target_sources(hydro PRIVATE ${SOURCE_FILES})
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    target_link_libraries(hydro -static-libgcc -static-libstdc++)
-endif ()
+add_executable(tests)
+
+target_sources(tests PRIVATE tests/tests.cpp)
+
+add_dependencies(tests hydro)
 

@@ -12,15 +12,16 @@
 
 int main(int argc, const char* argv[])
 {
-    if (argc != 2) {
+    if (argc != 3) {
         std::cerr << "[Error] Invalid number of arguments\n";
-        std::cout << "[Usage] hydro <input.hy>\n";
+        std::cout << "[Usage] hydro <input.hy> <output_path>\n";
         exit(EXIT_FAILURE);
     }
 
     const std::filesystem::path input_file_path = argv[1];
     const std::string input_filename = input_file_path.stem();
     const std::filesystem::path input_dir = input_file_path.root_directory();
+    const std::filesystem::path output_dir = argv[2];
 
     std::cout << "[Info] Compiling: " << input_file_path.string() << std::endl;
 
@@ -46,7 +47,7 @@ int main(int argc, const char* argv[])
 
     std::cout << "[Progress] Generating" << std::endl;
     {
-        std::fstream file((input_dir / (input_filename + ".asm")), std::ios::out);
+        std::fstream file((output_dir / (input_filename + ".asm")), std::ios::out);
 
         Generator gen(file);
         gen.print_u64_def();
@@ -61,7 +62,7 @@ int main(int argc, const char* argv[])
 
     std::cout << "[Progress] Assembling" << std::endl;
     std::stringstream nasm_cmd;
-    nasm_cmd << "nasm -felf64 " << input_dir / input_filename << ".asm";
+    nasm_cmd << "nasm -felf64 " << output_dir / input_filename << ".asm";
     int return_val = system(nasm_cmd.str().c_str());
 
     if (return_val != 0) {
@@ -71,7 +72,7 @@ int main(int argc, const char* argv[])
 
     std::cout << "[Progress] Linking" << std::endl;
     std::stringstream ld_cmd;
-    ld_cmd << "ld " << input_dir / input_filename << ".o -o " << input_filename;
+    ld_cmd << "ld " << output_dir / input_filename << ".o -o " << output_dir / input_filename;
     return_val = system(ld_cmd.str().c_str());
 
     if (return_val != 0) {
