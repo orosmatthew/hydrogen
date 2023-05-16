@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <stdlib.h>
+#include <vector>
+
 class Alloc {
 public:
     Alloc()

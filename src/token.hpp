@@ -1,6 +1,12 @@
 #pragma once
 
 #include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <vector>
+
 enum class TokenType {
     none,
     int_lit,
@@ -95,7 +101,7 @@ inline bool is_bin_op(TokenType type)
     }
 }
 
-std::string to_string(TokenType type)
+inline std::string to_string(TokenType type)
 {
     switch (type) {
     case TokenType::none:
@@ -134,7 +140,7 @@ struct Token {
     std::string value;
 };
 
-std::vector<Token> tokenize_file(const std::filesystem::path& path)
+inline std::vector<Token> tokenize_file(const std::filesystem::path& path)
 {
     std::fstream file(path.c_str(), std::ios::in);
     std::stringstream buffer;

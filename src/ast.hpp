@@ -3,6 +3,7 @@
 #include "alloc.hpp"
 #include "token.hpp"
 #include <variant>
+#include <optional>
 
 namespace ast {
 

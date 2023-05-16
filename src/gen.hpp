@@ -3,6 +3,7 @@
 #include <cassert>
 #include <ranges>
 #include <stack>
+#include <unordered_map>
 #include <utility>
 
 #include "ast.hpp"

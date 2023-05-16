@@ -5,3 +5,7 @@ cmake-*
 # vscode
 build
 .vscode
+
+# clangd
+.cache
+.clangd

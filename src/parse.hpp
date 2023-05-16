@@ -3,6 +3,7 @@
 #include "ast.hpp"
 #include "parse.hpp"
 #include "token.hpp"
+#include <cassert>
 
 class Parser {
 public:
