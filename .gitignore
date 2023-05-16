@@ -1,3 +1,7 @@
 # clion
 cmake-*
 .idea
+
+# vscode
+build
+.vscode

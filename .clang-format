@@ -12,6 +12,6 @@ PenaltyIndentedWhitespace: 1
 PointerAlignment: Left
 AllowShortFunctionsOnASingleLine: None
 AlwaysBreakTemplateDeclarations: Yes
-AlignConsecutiveMacros:
+AlignConsecutiveMacros: false
 AlignEscapedNewlines: DontAlign
 ...
