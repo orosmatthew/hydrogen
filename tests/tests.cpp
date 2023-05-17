@@ -58,4 +58,8 @@ int main(int argc, const char* argv[])
 
     run_test(compiler, "hello_world");
     run_test(compiler, "simple_math");
+    run_test(compiler, "incdec");
+    run_test(compiler, "bool");
+    run_test(compiler, "string");
+    run_test(compiler, "loops");
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <functional>
 #include <ranges>
 #include <stack>
 #include <unordered_map>
@@ -16,7 +17,6 @@ public:
 
     explicit Generator(std::fstream& file)
         : m_file(file)
-        , m_stack_loc(0)
         , m_label_count(0)
         , m_data_count(0)
     {
@@ -112,14 +112,13 @@ public:
     void print_newline()
     {
         m_file << "    ;; -- print_newline --\n";
-        push("0xA");
+        push(PrimitiveType::unknown, "0xA");
         m_file << "    mov rax, 1\n";
         m_file << "    mov rdi, 1\n";
         m_file << "    mov rsi, rsp\n";
         m_file << "    mov rdx, 1\n";
         m_file << "    syscall\n";
-        m_file << "    add rsp, 8\n";
-        m_stack_loc--;
+        pop();
     }
     void start()
     {
@@ -154,26 +153,26 @@ public:
             pop("rax");
             pop("rbx");
             m_file << "    imul rbx\n";
-            push("rax");
+            push(PrimitiveType::i64, "rax");
         }
         else if (expr_bin->tok_op->type == TokenType::div) {
             pop("rbx");
             pop("rax");
             m_file << "    cqo\n";
             m_file << "    idiv rbx\n";
-            push("rax");
+            push(PrimitiveType::i64, "rax");
         }
         else if (expr_bin->tok_op->type == TokenType::add) {
             pop("rax");
             pop("rbx");
             m_file << "    add rax, rbx\n";
-            push("rax");
+            push(PrimitiveType::i64, "rax");
         }
         else if (expr_bin->tok_op->type == TokenType::sub) {
             pop("rcx");
             pop("rdx");
             m_file << "    sub rdx, rcx\n";
-            push("rdx");
+            push(PrimitiveType::i64, "rdx");
         }
         else if (expr_bin->tok_op->type == TokenType::lt) {
             pop("rax");
@@ -181,7 +180,7 @@ public:
             m_file << "    cmp rax, rbx\n";
             m_file << "    setg al\n";
             m_file << "    movzx rax, al\n";
-            push("rax");
+            push(PrimitiveType::i64, "rax");
         }
         else if (expr_bin->tok_op->type == TokenType::gt) {
             pop("rax");
@@ -189,7 +188,7 @@ public:
             m_file << "    cmp rax, rbx\n";
             m_file << "    setl al\n";
             m_file << "    movzx rax, al\n";
-            push("rax");
+            push(PrimitiveType::i64, "rax");
         }
         else if (expr_bin->tok_op->type == TokenType::lte) {
             pop("rax");
@@ -197,7 +196,7 @@ public:
             m_file << "    cmp rax, rbx\n";
             m_file << "    setge al\n";
             m_file << "    movzx rax, al\n";
-            push("rax");
+            push(PrimitiveType::i64, "rax");
         }
         else if (expr_bin->tok_op->type == TokenType::gte) {
             pop("rax");
@@ -205,7 +204,7 @@ public:
             m_file << "    cmp rax, rbx\n";
             m_file << "    setle al\n";
             m_file << "    movzx rax, al\n";
-            push("rax");
+            push(PrimitiveType::i64, "rax");
         }
         else if (expr_bin->tok_op->type == TokenType::deq) {
             pop("rax");
@@ -213,7 +212,7 @@ public:
             m_file << "    cmp rax, rbx\n";
             m_file << "    sete al\n";
             m_file << "    movzx rax, al\n";
-            push("rax");
+            push(PrimitiveType::i64, "rax");
         }
         else if (expr_bin->tok_op->type == TokenType::neq) {
             pop("rax");
@@ -221,7 +220,7 @@ public:
             m_file << "    cmp rax, rbx\n";
             m_file << "    setne al\n";
             m_file << "    movzx rax, al\n";
-            push("rax");
+            push(PrimitiveType::i64, "rax");
         }
         else {
             // Unreachable
@@ -242,24 +241,24 @@ public:
             }
             void operator()(ast::NodeTermBaseNum* term_base_num)
             {
-                gen->push(term_base_num->tok_num->value);
+                gen->push(PrimitiveType::i64, term_base_num->tok_num->value);
                 type = PrimitiveType::i64;
             }
             void operator()(ast::NodeTermBaseIdent* term_base_ident)
             {
-                if (!gen->m_vars_lookup.contains(term_base_ident->tok_ident->value)) {
+                std::optional<StackItem> var = gen->stack_item_by_name(term_base_ident->tok_ident->value);
+                if (!var.has_value()) {
                     std::cerr << "[Error] Undefined identifier" << std::endl;
                     ::exit(EXIT_FAILURE);
                 }
-                const Var* var = gen->m_vars_lookup.at(term_base_ident->tok_ident->value);
                 std::stringstream str;
-                str << "QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "]";
-                gen->push(str.str());
+                str << "QWORD [rsp + 8*" << var->stack_offset(gen->m_stack.size()) << "]";
+                gen->push(PrimitiveType::i64, str.str());
 
                 if (term_base_ident->post.has_value()) {
                     struct PostVisitor {
                         Generator* gen;
-                        const Var* var;
+                        const StackItem* var;
 
                         void operator()(ast::NodePostInc* post_inc) const
                         {
@@ -267,30 +266,30 @@ public:
                                 std::cerr << "[Error] Increment not valid for type" << std::endl;
                                 ::exit(EXIT_FAILURE);
                             }
-                            gen->m_file << "    mov rax, [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "]\n";
+                            gen->m_file << "    mov rax, [rsp + 8*" << var->stack_offset(gen->m_stack.size()) << "]\n";
                             gen->m_file << "    mov rbx, 1\n";
                             gen->m_file << "    add rax, rbx\n";
-                            gen->m_file << "    mov QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset
+                            gen->m_file << "    mov QWORD [rsp + 8*" << var->stack_offset(gen->m_stack.size())
                                         << "], rax\n";
                         }
-                        void operator()(ast::NodePostDec* post_dec)
+                        void operator()(ast::NodePostDec* post_dec) const
                         {
                             if (var->type != PrimitiveType::i64) {
                                 std::cerr << "[Error] Increment not valid for type" << std::endl;
                                 ::exit(EXIT_FAILURE);
                             }
-                            gen->m_file << "    mov rax, [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "]\n";
+                            gen->m_file << "    mov rax, [rsp + 8*" << var->stack_offset(gen->m_stack.size()) << "]\n";
                             gen->m_file << "    mov rbx, 1\n";
                             gen->m_file << "    sub rax, rbx\n";
-                            gen->m_file << "    mov QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset
+                            gen->m_file << "    mov QWORD [rsp + 8*" << var->stack_offset(gen->m_stack.size())
                                         << "], rax\n";
                         }
                     };
-                    PostVisitor visitor(gen, var);
+                    PostVisitor visitor(gen, &var.value());
                     std::visit(visitor, term_base_ident->post.value()->var);
                 }
 
-                type = gen->m_vars_lookup.at(term_base_ident->tok_ident->value)->type;
+                type = gen->m_stack.at(gen->m_vars_lookup.at(term_base_ident->tok_ident->value)).type;
             }
             void operator()(ast::NodeTermBaseStr* term_base_str)
             {
@@ -305,53 +304,53 @@ public:
                     }
                 }
                 gen->m_data_stream << "\"\n";
-                gen->push("D" + std::to_string(data_num));
+                gen->push(PrimitiveType::i64, "D" + std::to_string(data_num));
                 type = PrimitiveType::u64;
             }
             void operator()(ast::NodeTermBaseTrue*)
             {
-                gen->push("1");
+                gen->push(PrimitiveType::i64, "1");
                 type = PrimitiveType::bool_;
             }
             void operator()(ast::NodeTermBaseFalse*)
             {
-                gen->push("0");
+                gen->push(PrimitiveType::i64, "0");
                 type = PrimitiveType::bool_;
             }
             void operator()(ast::NodeTermBaseInc* term_base_inc)
             {
-                if (!gen->m_vars_lookup.contains(term_base_inc->tok_ident->value)) {
+                std::optional<StackItem> var = gen->stack_item_by_name(term_base_inc->tok_ident->value);
+                if (!var.has_value()) {
                     std::cerr << "[Error] Undefined identifier" << std::endl;
                     ::exit(EXIT_FAILURE);
                 }
-                const Var* var = gen->m_vars_lookup.at(term_base_inc->tok_ident->value);
                 if (var->type != PrimitiveType::i64) {
                     std::cerr << "[Error] Cannot increment on type" << std::endl;
                     ::exit(EXIT_FAILURE);
                 }
-                gen->m_file << "    mov rax, QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "]\n";
+                gen->m_file << "    mov rax, QWORD [rsp + 8*" << var->stack_offset(gen->m_stack.size()) << "]\n";
                 gen->m_file << "    mov rbx, 1\n";
                 gen->m_file << "    add rax, rbx\n";
-                gen->m_file << "    mov QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "], rax\n";
-                gen->push("rax");
+                gen->m_file << "    mov QWORD [rsp + 8*" << var->stack_offset(gen->m_stack.size()) << "], rax\n";
+                gen->push(PrimitiveType::i64, "rax");
                 type = PrimitiveType::i64;
             }
             void operator()(ast::NodeTermBaseDec* term_base_dec)
             {
-                if (!gen->m_vars_lookup.contains(term_base_dec->tok_ident->value)) {
+                std::optional<StackItem> var = gen->stack_item_by_name(term_base_dec->tok_ident->value);
+                if (!var.has_value()) {
                     std::cerr << "[Error] Undefined identifier" << std::endl;
                     ::exit(EXIT_FAILURE);
                 }
-                const Var* var = gen->m_vars_lookup.at(term_base_dec->tok_ident->value);
                 if (var->type != PrimitiveType::i64) {
                     std::cerr << "[Error] Cannot decrement on type" << std::endl;
                     ::exit(EXIT_FAILURE);
                 }
-                gen->m_file << "    mov rax, QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "]\n";
+                gen->m_file << "    mov rax, QWORD [rsp + 8*" << var->stack_offset(gen->m_stack.size()) << "]\n";
                 gen->m_file << "    mov rbx, 1\n";
                 gen->m_file << "    sub rax, rbx\n";
-                gen->m_file << "    mov QWORD [rsp + 8*" << gen->m_stack_loc - var->stack_offset << "], rax\n";
-                gen->push("rax");
+                gen->m_file << "    mov QWORD [rsp + 8*" << var->stack_offset(gen->m_stack.size()) << "], rax\n";
+                gen->push(PrimitiveType::i64, "rax");
                 type = PrimitiveType::i64;
             }
         };
@@ -373,7 +372,7 @@ public:
                 type = gen->ast_term_base(term_neg->term_base);
                 gen->pop("rax");
                 gen->m_file << "    neg rax\n";
-                gen->push("rax");
+                gen->push(PrimitiveType::i64, "rax");
             }
             void operator()(ast::NodeTermBase* term_base)
             {
@@ -407,9 +406,10 @@ public:
         return visitor.type;
     }
 
-    void ast_scope(const ast::NodeScope* scope, ScopeType type, std::optional<std::string> break_label = std::nullopt)
+    void ast_scope(
+        const ast::NodeScope* scope, ScopeType type, const std::optional<std::string>& break_label = std::nullopt)
     {
-        begin_scope(type, std::move(break_label));
+        begin_scope(type, break_label);
         if (scope->stmt.has_value()) {
             ast_stmt(scope->stmt.value());
         }
@@ -435,7 +435,7 @@ public:
             {
                 if (!gen->m_vars_lookup.contains(stmt_let->tok_ident->value)) {
                     PrimitiveType type = gen->ast_expr(stmt_let->expr);
-                    gen->push_var(stmt_let->tok_ident->value, type);
+                    gen->name_var(stmt_let->tok_ident->value);
                 }
                 else {
                     std::cerr << "[Error] Identifier already defined: " << stmt_let->tok_ident->value << std::endl;
@@ -447,18 +447,20 @@ public:
             }
             void operator()(ast::NodeStmtEq* stmt_eq) const
             {
-                if (!gen->m_vars_lookup.contains(stmt_eq->tok_ident->value)) {
+                std::optional<StackItem> var = gen->stack_item_by_name(stmt_eq->tok_ident->value);
+                if (!var.has_value()) {
                     std::cerr << "[Error] Unknown identifier" << std::endl;
                     ::exit(EXIT_FAILURE);
                 }
                 PrimitiveType type = gen->ast_expr(stmt_eq->expr);
-                if (type != gen->m_vars_lookup.at(stmt_eq->tok_ident->value)->type) {
+                if (type != gen->m_stack.at(gen->m_vars_lookup.at(stmt_eq->tok_ident->value)).type) {
                     std::cerr << "[Error] Invalid type" << std::endl;
                     ::exit(EXIT_FAILURE);
                 }
                 gen->pop("rax");
                 gen->m_file << "    mov QWORD [rsp + 8*"
-                            << gen->m_stack_loc - gen->m_vars_lookup.at(stmt_eq->tok_ident->value)->stack_offset
+                            << gen->m_stack.at(gen->m_vars_lookup.at(stmt_eq->tok_ident->value))
+                                   .stack_offset(gen->m_stack.size())
                             << "], rax\n";
                 if (stmt_eq->next_stmt.has_value()) {
                     gen->ast_stmt(stmt_eq->next_stmt.value());
@@ -559,16 +561,31 @@ public:
         std::visit(visitor, stmt->var);
     }
 
-    void push(const std::string& str)
+    void name_var(const std::string& name)
     {
-        m_file << "    push " << str << "\n";
-        m_stack_loc++;
+        assert(!m_vars_lookup.contains(name));
+        m_vars_lookup.insert({ name, m_stack.size() - 1 });
+        m_stack.back().name = name;
     }
 
-    void pop(const std::string& str)
+    void push(PrimitiveType type, const std::string& str)
     {
-        m_file << "    pop " << str << "\n";
-        m_stack_loc--;
+        m_file << "    push " << str << "\n";
+        m_stack.push_back({ .stack_index = m_stack.size(), .type = type });
+    }
+
+    void pop(const std::optional<std::string>& str = std::nullopt)
+    {
+        if (str.has_value()) {
+            m_file << "    pop " << str.value() << "\n";
+        }
+        else {
+            m_file << "    add rsp, 8\n";
+        }
+        if (m_stack.back().name.has_value()) {
+            m_vars_lookup.erase(m_stack.back().name.value());
+        }
+        m_stack.pop_back();
     }
 
     std::string get_next_label()
@@ -576,50 +593,56 @@ public:
         return ".L" + std::to_string(m_label_count++);
     }
 
-    void begin_scope(ScopeType type, std::optional<std::string> break_label = std::nullopt)
+    void begin_scope(ScopeType type, const std::optional<std::string>& break_label = std::nullopt)
     {
-        m_scopes.push_back({ .type = type, .var_index = m_vars.size(), .break_label = std::move(break_label) });
+        m_scopes.push_back({ .type = type, .begin_stack_index = m_stack.size(), .break_label = break_label });
     }
 
     void end_scope()
     {
-        int var_pop_count = 0;
-        while (m_vars.size() > m_scopes.back().var_index) {
-            m_vars_lookup.erase(m_vars.back().name);
-            m_vars.pop_back();
-            var_pop_count++;
+        int pop_count = 0;
+        while (m_stack.size() > m_scopes.back().begin_stack_index) {
+            if (m_stack.back().name.has_value()) {
+                m_vars_lookup.erase(m_stack.back().name.value());
+            }
+            m_stack.pop_back();
+            pop_count++;
         }
         m_scopes.pop_back();
-        if (var_pop_count != 0) {
-            m_file << "    add rsp, " << 8 * var_pop_count << "\n";
+        if (pop_count != 0) {
+            m_file << "    add rsp, " << 8 * pop_count << "\n";
         }
-        m_stack_loc -= var_pop_count;
-    }
-
-    void push_var(const std::string& name, PrimitiveType type)
-    {
-        assert(!m_vars_lookup.contains(name));
-        m_vars.push_back({ .name = name, .stack_offset = m_stack_loc, .type = type });
-        m_vars_lookup.insert({ name, &m_vars.back() });
     }
 
 private:
-    struct Var {
-        std::string name;
-        int stack_offset;
-        PrimitiveType type;
-    };
-
     struct Scope {
         ScopeType type;
-        size_t var_index;
+        size_t begin_stack_index;
         std::optional<std::string> break_label;
     };
 
+    struct StackItem {
+        size_t stack_index;
+        PrimitiveType type;
+        std::optional<std::string> name;
+
+        [[nodiscard]] size_t stack_offset(size_t stack_size) const
+        {
+            return stack_size - 1 - stack_index;
+        }
+    };
+
+    [[nodiscard]] std::optional<std::reference_wrapper<StackItem>> stack_item_by_name(const std::string& name)
+    {
+        if (!m_vars_lookup.contains(name)) {
+            return {};
+        }
+        return m_stack.at(m_vars_lookup.at(name));
+    }
+
     std::fstream& m_file;
-    int m_stack_loc;
-    std::vector<Var> m_vars {};
-    std::unordered_map<std::string, Var*> m_vars_lookup {};
+    std::vector<StackItem> m_stack;
+    std::unordered_map<std::string, size_t> m_vars_lookup {};
     std::vector<Scope> m_scopes {};
     int m_label_count;
     int m_data_count;

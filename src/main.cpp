@@ -12,10 +12,17 @@
 
 int main(int argc, const char* argv[])
 {
-    if (argc != 3) {
+    if (argc < 3) {
         std::cerr << "[Error] Invalid number of arguments\n";
         std::cout << "[Usage] hydro <input.hy> <output_path>\n";
         exit(EXIT_FAILURE);
+    }
+
+    bool verbose = false;
+    for (int i = 0; i < argc; i++) {
+        if (std::string(argv[i]) == "-v" || std::string(argv[i]) == "--verbose") {
+            verbose = true;
+        }
     }
 
     const std::filesystem::path input_file_path = argv[1];
@@ -23,16 +30,22 @@ int main(int argc, const char* argv[])
     const std::filesystem::path input_dir = input_file_path.root_directory();
     const std::filesystem::path output_dir = argv[2];
 
-    std::cout << "[Info] Compiling: " << input_file_path.string() << std::endl;
+    if (verbose) {
+        std::cout << "[Info] Compiling: " << input_file_path.string() << std::endl;
+    }
 
-    std::cout << "[Progress] Tokenizing" << std::endl;
+    if (verbose) {
+        std::cout << "[Progress] Tokenizing" << std::endl;
+    }
 
     std::vector<Token> file_tokens = tokenize_file(input_file_path);
     //    for (const Token& token : file_tokens) {
     //        std::cout << token.value << "\t" << to_string(token.type) << std::endl;
     //    }
 
-    std::cout << "[Progress] Parsing" << std::endl;
+    if (verbose) {
+        std::cout << "[Progress] Parsing" << std::endl;
+    }
 
     Parser parser(std::move(file_tokens));
 
@@ -45,7 +58,9 @@ int main(int argc, const char* argv[])
 
     //    ast::print_ast(root);
 
-    std::cout << "[Progress] Generating" << std::endl;
+    if (verbose) {
+        std::cout << "[Progress] Generating" << std::endl;
+    }
     {
         std::fstream file((output_dir / (input_filename + ".asm")), std::ios::out);
 
@@ -60,7 +75,9 @@ int main(int argc, const char* argv[])
         gen.append_data();
     }
 
-    std::cout << "[Progress] Assembling" << std::endl;
+    if (verbose) {
+        std::cout << "[Progress] Assembling" << std::endl;
+    }
     std::stringstream nasm_cmd;
     nasm_cmd << "nasm -felf64 " << output_dir / input_filename << ".asm";
     int return_val = system(nasm_cmd.str().c_str());
@@ -70,7 +87,9 @@ int main(int argc, const char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    std::cout << "[Progress] Linking" << std::endl;
+    if (verbose) {
+        std::cout << "[Progress] Linking" << std::endl;
+    }
     std::stringstream ld_cmd;
     ld_cmd << "ld " << output_dir / input_filename << ".o -o " << output_dir / input_filename;
     return_val = system(ld_cmd.str().c_str());
@@ -80,6 +99,8 @@ int main(int argc, const char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    std::cout << "[Progress] Done" << std::endl;
+    if (verbose) {
+        std::cout << "[Progress] Done" << std::endl;
+    }
     return EXIT_SUCCESS;
 }
