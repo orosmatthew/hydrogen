@@ -2,8 +2,8 @@
 
 #include "alloc.hpp"
 #include "token.hpp"
-#include <variant>
 #include <optional>
+#include <variant>
 
 namespace ast {
 
@@ -97,16 +97,12 @@ struct NodeStmtLet {
     const Token* tok_ident;
     const Token* tok_eq;
     NodeExpr* expr;
-    const Token* tok_semi;
-    std::optional<NodeStmt*> next_stmt;
 };
 
 struct NodeStmtEq {
     const Token* tok_ident;
     const Token* tok_eq;
     NodeExpr* expr;
-    const Token* tok_semi;
-    std::optional<NodeStmt*> next_stmt;
 };
 
 struct NodeStmtPrint {
@@ -114,13 +110,13 @@ struct NodeStmtPrint {
     const Token* tok_left_paren;
     NodeExpr* expr;
     const Token* tok_right_paren;
-    const Token* tok_semi;
-    std::optional<NodeStmt*> next_stmt;
 };
+
+struct NodeBlock;
 
 struct NodeScope {
     const Token* tok_left_curly;
-    std::optional<NodeStmt*> stmt;
+    std::optional<NodeBlock*> block;
     const Token* tok_right_curly;
 };
 
@@ -129,19 +125,17 @@ struct NodeElse {
     NodeScope* scope;
 };
 
-struct NodeStmtIf {
+struct NodeControlIf {
     const Token* tok_if;
     const Token* tok_left_paren;
     NodeExpr* expr;
     const Token* tok_right_paren;
     NodeScope* scope;
     std::optional<NodeElse*> else_;
-    std::optional<NodeStmt*> next_stmt;
 };
 
-struct NodeStmtScope {
+struct NodeControlScope {
     NodeScope* scope;
-    std::optional<NodeStmt*> next_stmt;
 };
 
 struct NodeStmtWrite {
@@ -151,43 +145,57 @@ struct NodeStmtWrite {
     const Token* tok_comma;
     NodeExpr* expr2;
     const Token* tok_right_paren;
-    const Token* tok_semi;
-    std::optional<NodeStmt*> next_stmt;
 };
 
-struct NodeStmtWhile {
+struct NodeControlWhile {
     const Token* tok_while;
     const Token* tok_left_paren;
     NodeExpr* expr;
     const Token* tok_right_paren;
     NodeScope* scope;
-    std::optional<ast::NodeStmt*> next_stmt;
 };
 
 struct NodeStmtBreak {
     const Token* tok_break;
-    const Token* tok_semi;
-    std::optional<NodeStmt*> next_stmt;
 };
 
 struct NodeStmtExpr {
     NodeExpr* expr;
-    const Token* tok_semi;
-    std::optional<NodeStmt*> next_stmt;
+};
+
+struct NodeControlFor {
+    const Token* tok_for;
+    const Token* tok_left_paren;
+    NodeStmt* init_stmt;
+    const Token* tok_semi_1;
+    NodeExpr* expr;
+    const Token* tok_semi_2;
+    NodeStmt* loop_stmt;
+    const Token* tok_right_paren;
+    NodeScope* scope;
 };
 
 struct NodeStmt {
-    std::variant<
-        NodeStmtPrint*,
-        NodeStmtLet*,
-        NodeStmtEq*,
-        NodeStmtIf*,
-        NodeStmtScope*,
-        NodeStmtWrite*,
-        NodeStmtWhile*,
-        NodeStmtBreak*,
-        NodeStmtExpr*>
-        var;
+    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*, NodeStmtWrite*, NodeStmtBreak*, NodeStmtExpr*> var;
+};
+
+struct NodeControl {
+    std::variant<NodeControlIf*, NodeControlScope*, NodeControlWhile*, NodeControlFor*> var;
+};
+
+struct NodeBlockStmt {
+    NodeStmt* stmt;
+    const Token* tok_semi;
+    std::optional<NodeBlock*> next;
+};
+
+struct NodeBlockControl {
+    NodeControl* control;
+    std::optional<NodeBlock*> next;
+};
+
+struct NodeBlock {
+    std::variant<NodeBlockStmt*, NodeBlockControl*> var;
 };
 
 // TODO

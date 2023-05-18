@@ -211,7 +211,7 @@ public:
         if (peak().has_value() && peak().value()->type == TokenType::left_curly) {
             auto* scope = m_alloc.alloc<ast::NodeScope>();
             scope->tok_left_curly = consume();
-            scope->stmt = parse_stmt();
+            scope->block = parse_block();
             if (peak().has_value() && peak().value()->type == TokenType::right_curly) {
                 scope->tok_right_curly = consume();
             }
@@ -252,13 +252,6 @@ public:
             else {
                 error("Expected expression");
             }
-            if (peak().has_value() && peak().value()->type == TokenType::semi) {
-                stmt_eq->tok_semi = consume();
-            }
-            else {
-                error("Expected `;`");
-            }
-            stmt_eq->next_stmt = parse_stmt();
             stmt->var = stmt_eq;
             return stmt;
         }
@@ -280,13 +273,6 @@ public:
             else {
                 error("Expected `)`");
             }
-            if (peak().has_value() && peak().value()->type == TokenType::semi) {
-                print_stmt->tok_semi = consume();
-            }
-            else {
-                error("Expected `;`");
-            }
-            print_stmt->next_stmt = parse_stmt();
             stmt->var = print_stmt;
             return stmt;
         }
@@ -303,43 +289,7 @@ public:
             else {
                 error("Expected expression");
             }
-            if (peak().has_value() && peak().value()->type == TokenType::semi) {
-                stmt_let->tok_semi = consume();
-            }
-            else {
-                error("Expected `;`");
-            }
-            stmt_let->next_stmt = parse_stmt();
             stmt->var = stmt_let;
-            return stmt;
-        }
-        else if (
-            peak(2).has_value() && peak().value()->type == TokenType::if_
-            && peak(2).value()->type == TokenType::left_paren) {
-            auto* stmt_if = m_alloc.alloc<ast::NodeStmtIf>();
-            stmt_if->tok_if = consume();
-            stmt_if->tok_left_paren = consume();
-            if (auto expr = parse_expr()) {
-                stmt_if->expr = expr.value();
-            }
-            else {
-                error("Expected expression");
-            }
-            if (peak().has_value() && peak().value()->type == TokenType::right_paren) {
-                stmt_if->tok_right_paren = consume();
-            }
-            else {
-                error("Expected `)`");
-            }
-            if (auto scope = parse_scope()) {
-                stmt_if->scope = scope.value();
-            }
-            else {
-                error("Expected scope with `{` and `}`");
-            }
-            stmt_if->else_ = parse_else();
-            stmt_if->next_stmt = parse_stmt();
-            stmt->var = stmt_if;
             return stmt;
         }
         else if (
@@ -372,73 +322,173 @@ public:
             else {
                 error("Expected `)`");
             }
-            if (peak().has_value() && peak().value()->type == TokenType::semi) {
-                stmt_write->tok_semi = consume();
-            }
-            else {
-                error("Expected `;`");
-            }
-            stmt_write->next_stmt = parse_stmt();
             stmt->var = stmt_write;
             return stmt;
         }
-        else if (auto scope = parse_scope()) {
-            auto* stmt_scope = m_alloc.alloc<ast::NodeStmtScope>();
-            stmt_scope->scope = scope.value();
-            stmt_scope->next_stmt = parse_stmt();
-            stmt->var = stmt_scope;
-            return stmt;
-        }
-        else if (
-            peak(2).has_value() && peak().value()->type == TokenType::while_
-            && peak(2).value()->type == TokenType::left_paren) {
-            auto* stmt_while = m_alloc.alloc<ast::NodeStmtWhile>();
-            stmt_while->tok_while = consume();
-            stmt_while->tok_left_paren = consume();
-            if (auto expr = parse_expr()) {
-                stmt_while->expr = expr.value();
-            }
-            else {
-                error("Expected expression");
-            }
-            if (peak().has_value() && peak().value()->type == TokenType::right_paren) {
-                stmt_while->tok_right_paren = consume();
-            }
-            else {
-                error("Expected `)`");
-            }
-            if (auto node_scope = parse_scope()) {
-                stmt_while->scope = node_scope.value();
-            }
-            else {
-                error("Expected scope");
-            }
-            stmt_while->next_stmt = parse_stmt();
-            stmt->var = stmt_while;
-            return stmt;
-        }
-        else if (
-            peak(2).has_value() && peak().value()->type == TokenType::break_
-            && peak(2).value()->type == TokenType::semi) {
+        else if (peak().has_value() && peak().value()->type == TokenType::break_) {
             auto stmt_break = m_alloc.alloc<ast::NodeStmtBreak>();
             stmt_break->tok_break = consume();
-            stmt_break->tok_semi = consume();
-            stmt_break->next_stmt = parse_stmt();
             stmt->var = stmt_break;
             return stmt;
         }
         else if (auto expr = parse_expr()) {
             auto stmt_expr = m_alloc.alloc<ast::NodeStmtExpr>();
             stmt_expr->expr = expr.value();
-            if (!peak().has_value() || peak().value()->type != TokenType::semi) {
-                error("Expected `;`");
-            }
-            stmt_expr->tok_semi = consume();
-            stmt_expr->next_stmt = parse_stmt();
             stmt->var = stmt_expr;
             return stmt;
         }
         return {};
+    }
+
+    std::optional<ast::NodeControl*> parse_control()
+    {
+        if (peak(2).has_value() && peak().value()->type == TokenType::for_
+            && peak(2).value()->type == TokenType::left_paren) {
+            auto control = m_alloc.alloc<ast::NodeControl>();
+            auto control_for = m_alloc.alloc<ast::NodeControlFor>();
+            control_for->tok_for = consume();
+            control_for->tok_left_paren = consume();
+            if (auto init_stmt = parse_stmt()) {
+                control_for->init_stmt = init_stmt.value();
+            }
+            else {
+                error("Expected statement");
+            }
+            if (peak().value()->type == TokenType::semi) {
+                control_for->tok_semi_1 = consume();
+            }
+            else {
+                error("Expected `;`");
+            }
+            if (auto expr = parse_expr()) {
+                control_for->expr = expr.value();
+            }
+            else {
+                error("Expected expression");
+            }
+            if (peak().value()->type == TokenType::semi) {
+                control_for->tok_semi_2 = consume();
+            }
+            else {
+                error("Expected `;`");
+            }
+            if (auto loop_stmt = parse_stmt()) {
+                control_for->loop_stmt = loop_stmt.value();
+            }
+            else {
+                error("Expected statement");
+            }
+            if (peak().has_value() && peak().value()->type == TokenType::right_paren) {
+                control_for->tok_right_paren = consume();
+            }
+            else {
+                error("Expected `)`");
+            }
+            if (auto loop_scope = parse_scope()) {
+                control_for->scope = loop_scope.value();
+            }
+            else {
+                error("Expected scope beginning with `{`");
+            }
+            control->var = control_for;
+            return control;
+        }
+        else if (
+            peak(2).has_value() && peak().value()->type == TokenType::while_
+            && peak(2).value()->type == TokenType::left_paren) {
+            auto control = m_alloc.alloc<ast::NodeControl>();
+            auto* control_while = m_alloc.alloc<ast::NodeControlWhile>();
+            control_while->tok_while = consume();
+            control_while->tok_left_paren = consume();
+            if (auto expr = parse_expr()) {
+                control_while->expr = expr.value();
+            }
+            else {
+                error("Expected expression");
+            }
+            if (peak().has_value() && peak().value()->type == TokenType::right_paren) {
+                control_while->tok_right_paren = consume();
+            }
+            else {
+                error("Expected `)`");
+            }
+            if (auto node_scope = parse_scope()) {
+                control_while->scope = node_scope.value();
+            }
+            else {
+                error("Expected scope");
+            }
+            control->var = control_while;
+            return control;
+        }
+        else if (
+            peak(2).has_value() && peak().value()->type == TokenType::if_
+            && peak(2).value()->type == TokenType::left_paren) {
+            auto control = m_alloc.alloc<ast::NodeControl>();
+            auto* control_if = m_alloc.alloc<ast::NodeControlIf>();
+            control_if->tok_if = consume();
+            control_if->tok_left_paren = consume();
+            if (auto expr = parse_expr()) {
+                control_if->expr = expr.value();
+            }
+            else {
+                error("Expected expression");
+            }
+            if (peak().has_value() && peak().value()->type == TokenType::right_paren) {
+                control_if->tok_right_paren = consume();
+            }
+            else {
+                error("Expected `)`");
+            }
+            if (auto scope = parse_scope()) {
+                control_if->scope = scope.value();
+            }
+            else {
+                error("Expected scope with `{` and `}`");
+            }
+            control_if->else_ = parse_else();
+            control->var = control_if;
+            return control;
+        }
+        else if (auto scope = parse_scope()) {
+            auto control = m_alloc.alloc<ast::NodeControl>();
+            auto control_scope = m_alloc.alloc<ast::NodeControlScope>();
+            control_scope->scope = scope.value();
+            control->var = control_scope;
+            return control;
+        }
+        else {
+            return {};
+        }
+    }
+
+    std::optional<ast::NodeBlock*> parse_block()
+    {
+        if (auto stmt = parse_stmt()) {
+            auto block = m_alloc.alloc<ast::NodeBlock>();
+            auto block_stmt = m_alloc.alloc<ast::NodeBlockStmt>();
+            block_stmt->stmt = stmt.value();
+            if (peak().has_value() && peak().value()->type == TokenType::semi) {
+                block_stmt->tok_semi = consume();
+            }
+            else {
+                error("Expected `;`");
+            }
+            block_stmt->next = parse_block();
+            block->var = block_stmt;
+            return block;
+        }
+        else if (auto control = parse_control()) {
+            auto block = m_alloc.alloc<ast::NodeBlock>();
+            auto block_control = m_alloc.alloc<ast::NodeBlockControl>();
+            block_control->control = control.value();
+            block_control->next = parse_block();
+            block->var = block_control;
+            return block;
+        }
+        else {
+            return {};
+        }
     }
 
 private:

@@ -410,8 +410,8 @@ public:
         const ast::NodeScope* scope, ScopeType type, const std::optional<std::string>& break_label = std::nullopt)
     {
         begin_scope(type, break_label);
-        if (scope->stmt.has_value()) {
-            ast_stmt(scope->stmt.value());
+        if (scope->block.has_value()) {
+            ast_block(scope->block.value());
         }
         end_scope();
     }
@@ -427,9 +427,6 @@ public:
                 gen->pop("rdi");
                 gen->print_i64();
                 gen->print_newline();
-                if (stmt_print->next_stmt.has_value()) {
-                    gen->ast_stmt(stmt_print->next_stmt.value());
-                }
             }
             void operator()(ast::NodeStmtLet* stmt_let) const
             {
@@ -440,9 +437,6 @@ public:
                 else {
                     std::cerr << "[Error] Identifier already defined: " << stmt_let->tok_ident->value << std::endl;
                     ::exit(EXIT_FAILURE);
-                }
-                if (stmt_let->next_stmt.has_value()) {
-                    gen->ast_stmt(stmt_let->next_stmt.value());
                 }
             }
             void operator()(ast::NodeStmtEq* stmt_eq) const
@@ -462,38 +456,6 @@ public:
                             << gen->m_stack.at(gen->m_vars_lookup.at(stmt_eq->tok_ident->value))
                                    .stack_offset(gen->m_stack.size())
                             << "], rax\n";
-                if (stmt_eq->next_stmt.has_value()) {
-                    gen->ast_stmt(stmt_eq->next_stmt.value());
-                }
-            }
-            void operator()(ast::NodeStmtIf* stmt_if) const
-            {
-                gen->ast_expr(stmt_if->expr);
-                const std::string else_label = gen->get_next_label();
-                gen->pop("rax");
-                gen->m_file << "    test rax, rax\n";
-                gen->m_file << "    jz " << else_label << "\n";
-                gen->ast_scope(stmt_if->scope, ScopeType::generic);
-                if (stmt_if->else_.has_value()) {
-                    const std::string end_label = gen->get_next_label();
-                    gen->m_file << "    jmp " << end_label << "\n";
-                    gen->m_file << else_label << ":\n";
-                    gen->ast_scope(stmt_if->else_.value()->scope, ScopeType::generic);
-                    gen->m_file << end_label << ":\n";
-                }
-                else {
-                    gen->m_file << else_label << ":\n";
-                }
-                if (stmt_if->next_stmt.has_value()) {
-                    gen->ast_stmt(stmt_if->next_stmt.value());
-                }
-            }
-            void operator()(ast::NodeStmtScope* stmt_scope) const
-            {
-                gen->ast_scope(stmt_scope->scope, ScopeType::generic);
-                if (stmt_scope->next_stmt.has_value()) {
-                    gen->ast_stmt(stmt_scope->next_stmt.value());
-                }
             }
             void operator()(ast::NodeStmtWrite* stmt_write) const
             {
@@ -504,25 +466,6 @@ public:
                 gen->m_file << "    mov rax, 1\n";
                 gen->m_file << "    mov rdi, 1\n";
                 gen->m_file << "    syscall\n";
-                if (stmt_write->next_stmt.has_value()) {
-                    gen->ast_stmt(stmt_write->next_stmt.value());
-                }
-            }
-            void operator()(ast::NodeStmtWhile* stmt_while) const
-            {
-                const std::string begin_label = gen->get_next_label();
-                const std::string end_label = gen->get_next_label();
-                gen->m_file << begin_label << ":\n";
-                gen->ast_expr(stmt_while->expr);
-                gen->pop("rax");
-                gen->m_file << "    test rax, rax\n";
-                gen->m_file << "    jz " << end_label << "\n";
-                gen->ast_scope(stmt_while->scope, ScopeType::loop, end_label);
-                gen->m_file << "    jmp " << begin_label << "\n";
-                gen->m_file << end_label << ":\n";
-                if (stmt_while->next_stmt.has_value()) {
-                    gen->ast_stmt(stmt_while->next_stmt.value());
-                }
             }
             void operator()(ast::NodeStmtBreak* stmt_break) const
             {
@@ -543,22 +486,108 @@ public:
                     gen->end_scope();
                 }
                 gen->m_file << "    jmp " << break_label.value() << "\n";
-                if (stmt_break->next_stmt.has_value()) {
-                    gen->ast_stmt(stmt_break->next_stmt.value());
-                }
             }
             void operator()(ast::NodeStmtExpr* stmt_expr) const
             {
                 gen->ast_expr(stmt_expr->expr);
-                if (stmt_expr->next_stmt.has_value()) {
-                    gen->ast_stmt(stmt_expr->next_stmt.value());
-                }
             }
         };
 
         m_file << "    ;; -- stmt --\n";
         StmtVisitor visitor { this };
         std::visit(visitor, stmt->var);
+    }
+
+    void ast_control(const ast::NodeControl* control)
+    {
+        struct ControlVisitor {
+            Generator* gen = nullptr;
+
+            void operator()(ast::NodeControlFor* stmt_for) const
+            {
+                gen->begin_scope(ScopeType::generic);
+                gen->ast_stmt(stmt_for->init_stmt);
+                const std::string begin_label = gen->get_next_label();
+                const std::string end_label = gen->get_next_label();
+                gen->m_file << begin_label << ":\n";
+                gen->begin_scope(ScopeType::loop, end_label);
+                gen->ast_expr(stmt_for->expr);
+                gen->pop("rax");
+                gen->m_file << "    test rax, rax\n";
+                gen->m_file << "    jz " << end_label << "\n";
+                gen->ast_scope(stmt_for->scope, ScopeType::loop, end_label);
+                gen->ast_stmt(stmt_for->loop_stmt);
+                gen->end_scope();
+                gen->m_file << "    jmp " << begin_label << "\n";
+                gen->m_file << end_label << ":\n";
+                gen->end_scope();
+            }
+            void operator()(ast::NodeControlWhile* stmt_while) const
+            {
+                const std::string begin_label = gen->get_next_label();
+                const std::string end_label = gen->get_next_label();
+                gen->m_file << begin_label << ":\n";
+                gen->ast_expr(stmt_while->expr);
+                gen->pop("rax");
+                gen->m_file << "    test rax, rax\n";
+                gen->m_file << "    jz " << end_label << "\n";
+                gen->ast_scope(stmt_while->scope, ScopeType::loop, end_label);
+                gen->m_file << "    jmp " << begin_label << "\n";
+                gen->m_file << end_label << ":\n";
+            }
+            void operator()(ast::NodeControlScope* stmt_scope) const
+            {
+                gen->ast_scope(stmt_scope->scope, ScopeType::generic);
+            }
+            void operator()(ast::NodeControlIf* stmt_if) const
+            {
+                gen->ast_expr(stmt_if->expr);
+                const std::string else_label = gen->get_next_label();
+                gen->pop("rax");
+                gen->m_file << "    test rax, rax\n";
+                gen->m_file << "    jz " << else_label << "\n";
+                gen->ast_scope(stmt_if->scope, ScopeType::generic);
+                if (stmt_if->else_.has_value()) {
+                    const std::string end_label = gen->get_next_label();
+                    gen->m_file << "    jmp " << end_label << "\n";
+                    gen->m_file << else_label << ":\n";
+                    gen->ast_scope(stmt_if->else_.value()->scope, ScopeType::generic);
+                    gen->m_file << end_label << ":\n";
+                }
+                else {
+                    gen->m_file << else_label << ":\n";
+                }
+            }
+        };
+        m_file << "    ;; -- control --\n";
+        ControlVisitor visitor { this };
+        std::visit(visitor, control->var);
+    }
+
+    void ast_block(const ast::NodeBlock* block)
+    {
+        struct BlockVisitor {
+            Generator* gen = nullptr;
+
+            void operator()(const ast::NodeBlockStmt* block_stmt) const
+            {
+                gen->ast_stmt(block_stmt->stmt);
+                if (block_stmt->next.has_value()) {
+                    gen->ast_block(block_stmt->next.value());
+                }
+            }
+
+            void operator()(const ast::NodeBlockControl* block_control) const
+            {
+                gen->ast_control(block_control->control);
+                if (block_control->next.has_value()) {
+                    gen->ast_block(block_control->next.value());
+                }
+            }
+        };
+
+        BlockVisitor visitor { this };
+        std::visit(visitor, block->var);
     }
 
     void name_var(const std::string& name)

@@ -40,6 +40,7 @@ enum class TokenType {
     break_,
     inc,
     dec,
+    for_,
 };
 
 enum class BinAssoc { none, left, right };
@@ -191,6 +192,9 @@ inline std::vector<Token> tokenize_file(const std::filesystem::path& path)
             }
             else if (buf == "break") {
                 tokens.push_back({ TokenType::break_, buf });
+            }
+            else if (buf == "for") {
+                tokens.push_back({ TokenType::for_, buf });
             }
             else {
                 tokens.push_back({ TokenType::ident, buf });

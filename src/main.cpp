@@ -49,12 +49,12 @@ int main(int argc, const char* argv[])
 
     Parser parser(std::move(file_tokens));
 
-    const auto ret = parser.parse_stmt();
+    const auto ret = parser.parse_block();
     if (!ret.has_value()) {
-        std::cerr << "[Error] Expected statement" << std::endl;
+        std::cerr << "[Error] Expected statement list" << std::endl;
         exit(EXIT_FAILURE);
     }
-    const ast::NodeStmt* root = ret.value();
+    const ast::NodeBlock* root = ret.value();
 
     //    ast::print_ast(root);
 
@@ -69,7 +69,7 @@ int main(int argc, const char* argv[])
         gen.print_i64_def();
         gen.start();
         {
-            gen.ast_stmt(root);
+            gen.ast_block(root);
             gen.exit();
         }
         gen.append_data();
