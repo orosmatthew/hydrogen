@@ -12,7 +12,7 @@ $$
         \text{ident} = \text{[Expr]} \\
         \text{print}(\text{[Expr]}) \\
         \text{write}(\text{[Expr]},\text{[Expr]})\\
-        \text{let} \space \text{ident} = \text{[Expr]} \\
+        \text{var} \space \text{ident} = \text{[Expr]} \\
         \text{break}\\
         \epsilon
     \end{cases} \\

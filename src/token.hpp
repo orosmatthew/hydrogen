@@ -17,7 +17,7 @@ enum class TokenType {
     left_paren,
     right_paren,
     semi,
-    let,
+    var,
     ident,
     eq,
     print,
@@ -123,8 +123,8 @@ inline std::string to_string(TokenType type)
         return "right_paren";
     case TokenType::semi:
         return "semi";
-    case TokenType::let:
-        return "let";
+    case TokenType::var:
+        return "var";
     case TokenType::ident:
         return "ident";
     case TokenType::eq:
@@ -166,8 +166,8 @@ inline std::vector<Token> tokenize_file(const std::filesystem::path& path)
                 i++;
             } while (isalnum(source[i]) || source[i] == '_');
             i--;
-            if (buf == "let") {
-                tokens.push_back({ TokenType::let, buf });
+            if (buf == "var") {
+                tokens.push_back({ TokenType::var, buf });
             }
             else if (buf == "print") {
                 tokens.push_back({ TokenType::print, buf });

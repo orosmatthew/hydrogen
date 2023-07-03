@@ -277,19 +277,19 @@ public:
             return stmt;
         }
         else if (
-            peak(3).has_value() && peak().value()->type == TokenType::let && peak(2).value()->type == TokenType::ident
+            peak(3).has_value() && peak().value()->type == TokenType::var && peak(2).value()->type == TokenType::ident
             && peak(3).value()->type == TokenType::eq) {
-            auto* stmt_let = m_alloc.alloc<ast::NodeStmtLet>();
-            stmt_let->tok_let = consume();
-            stmt_let->tok_ident = consume();
-            stmt_let->tok_eq = consume();
+            auto* stmt_var = m_alloc.alloc<ast::NodeStmtVar>();
+            stmt_var->tok_var = consume();
+            stmt_var->tok_ident = consume();
+            stmt_var->tok_eq = consume();
             if (auto expr = parse_expr()) {
-                stmt_let->expr = expr.value();
+                stmt_var->expr = expr.value();
             }
             else {
                 error("Expected expression");
             }
-            stmt->var = stmt_let;
+            stmt->var = stmt_var;
             return stmt;
         }
         else if (

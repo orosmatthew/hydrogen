@@ -32,9 +32,6 @@ int main(int argc, const char* argv[])
 
     if (verbose) {
         std::cout << "[Info] Compiling: " << input_file_path.string() << std::endl;
-    }
-
-    if (verbose) {
         std::cout << "[Progress] Tokenizing" << std::endl;
     }
 

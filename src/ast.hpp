@@ -92,8 +92,8 @@ struct NodeExpr {
 
 struct NodeStmt;
 
-struct NodeStmtLet {
-    const Token* tok_let;
+struct NodeStmtVar {
+    const Token* tok_var;
     const Token* tok_ident;
     const Token* tok_eq;
     NodeExpr* expr;
@@ -176,7 +176,7 @@ struct NodeControlFor {
 };
 
 struct NodeStmt {
-    std::variant<NodeStmtPrint*, NodeStmtLet*, NodeStmtEq*, NodeStmtWrite*, NodeStmtBreak*, NodeStmtExpr*> var;
+    std::variant<NodeStmtPrint*, NodeStmtVar*, NodeStmtEq*, NodeStmtWrite*, NodeStmtBreak*, NodeStmtExpr*> var;
 };
 
 struct NodeControl {

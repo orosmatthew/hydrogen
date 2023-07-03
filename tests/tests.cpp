@@ -56,10 +56,10 @@ int main(int argc, const char* argv[])
 
     const std::string compiler(argv[1]);
 
-    run_test(compiler, "hello_world");
-    run_test(compiler, "simple_math");
-    run_test(compiler, "incdec");
-    run_test(compiler, "bool");
-    run_test(compiler, "string");
-    run_test(compiler, "loops");
+    run_test(compiler, "tests/hello_world");
+    run_test(compiler, "tests/simple_math");
+    run_test(compiler, "tests/incdec");
+    run_test(compiler, "tests/bool");
+    run_test(compiler, "tests/string");
+    run_test(compiler, "tests/loops");
 }

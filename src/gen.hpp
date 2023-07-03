@@ -428,14 +428,14 @@ public:
                 gen->print_i64();
                 gen->print_newline();
             }
-            void operator()(ast::NodeStmtLet* stmt_let) const
+            void operator()(ast::NodeStmtVar* stmt_var) const
             {
-                if (!gen->m_vars_lookup.contains(stmt_let->tok_ident->value)) {
-                    PrimitiveType type = gen->ast_expr(stmt_let->expr);
-                    gen->name_var(stmt_let->tok_ident->value);
+                if (!gen->m_vars_lookup.contains(stmt_var->tok_ident->value)) {
+                    PrimitiveType type = gen->ast_expr(stmt_var->expr);
+                    gen->name_var(stmt_var->tok_ident->value);
                 }
                 else {
-                    std::cerr << "[Error] Identifier already defined: " << stmt_let->tok_ident->value << std::endl;
+                    std::cerr << "[Error] Identifier already defined: " << stmt_var->tok_ident->value << std::endl;
                     ::exit(EXIT_FAILURE);
                 }
             }

@@ -1,5 +1,5 @@
-let a = 0;
-let b = 1;
+var a = 0;
+var b = 1;
 
 if (a) {
     write("true\n", 5);
@@ -13,8 +13,8 @@ if (b) {
     write("false\n", 6);
 }
 
-let c = true;
-let d = false;
+var c = true;
+var d = false;
 
 if (c) {
     write("true\n", 5);
